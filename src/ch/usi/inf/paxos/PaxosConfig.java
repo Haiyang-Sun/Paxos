@@ -1,0 +1,77 @@
+package ch.usi.inf.paxos;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.util.Scanner;
+
+import ch.usi.inf.network.NetworkGroup;
+import ch.usi.inf.paxos.roles.Proposer;
+
+public class PaxosConfig {
+	public static boolean debug = false;
+	public static final int NUM_ACCEPTORS = 3; 
+	public static final int NUM_QUORUM = 2; 
+	
+	static NetworkGroup clientNetwork;
+	static NetworkGroup proposerNetwork;
+	static NetworkGroup acceptorNetwork;
+	static NetworkGroup learnerNetwork;
+	public enum NetworkLevel {NORMAL};
+	static NetworkLevel networkLevel = NetworkLevel.NORMAL;
+	public static boolean extraThreadDispatching = true;
+	public static long decisionBroadcastIntervalMilisecs = 5000;
+	public static long timeoutMilisecs = 10000;
+	public static boolean initFromFile(String path){
+		try {
+			File file = new File(path);
+			Scanner scanner = new Scanner(file);
+			String line = null;
+			try{
+				while(scanner.hasNextLine()){
+					line=scanner.nextLine();
+					String[] elems = line.split("\\s");
+					switch (elems[0]){
+						case "clients":
+							PaxosConfig.clientNetwork = new NetworkGroup(elems[1], Integer.parseInt(elems[2]));
+							break;
+						case "proposers":
+							PaxosConfig.proposerNetwork = new NetworkGroup(elems[1], Integer.parseInt(elems[2]));
+							break;
+						case "acceptors":
+							PaxosConfig.acceptorNetwork = new NetworkGroup(elems[1], Integer.parseInt(elems[2]));
+							break;
+						case "learners":
+							PaxosConfig.learnerNetwork = new NetworkGroup(elems[1], Integer.parseInt(elems[2]));
+							break;
+					}
+				}
+			}catch (Exception e){
+				e.printStackTrace();
+				System.err.println("Error input format");
+				return false;
+			}
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return false;
+		}
+		return true;
+	}
+	public static NetworkGroup getClientNetwork() {
+		return clientNetwork;
+	}
+	public static NetworkGroup getProposerNetwork() {
+		return proposerNetwork;
+	}
+	public static NetworkGroup getAcceptorNetwork() {
+		return acceptorNetwork;
+	}
+	public static NetworkGroup getLearnerNetwork() {
+		return learnerNetwork;
+	}
+	
+	public static NetworkLevel getNetworkLevel() {
+		return networkLevel;
+	}
+}
