@@ -1,7 +1,11 @@
 package ch.usi.inf.paxos.messages;
 
+import java.net.ConnectException;
 import java.nio.ByteBuffer;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
+
+import javax.sql.ConnectionPoolDataSource;
 
 import ch.usi.inf.logging.Logger;
 import ch.usi.inf.network.BaseMulticast;
@@ -61,12 +65,21 @@ public class PaxosMessenger {
 		}
 		return MessageType.MSG_UNKONWN;
 	}
-	
+	static ConcurrentHashMap<NetworkGroup, Multicast> connectionPool = new ConcurrentHashMap<NetworkGroup, Multicast>();
 	static Multicast getMulticast(NetworkGroup target){
+		Multicast res = null;
+		if(connectionPool.containsKey(target)){
+			return connectionPool.get(target);
+		}
 		if(PaxosConfig.getNetworkLevel() == NetworkLevel.NORMAL)
-			return new BaseMulticast(target);
+			res = new BaseMulticast(target);
 		else
-			return null;
+			res = null;
+		Multicast ret = connectionPool.putIfAbsent(target, res);
+		if(ret == null)
+			return res;
+		else
+			return ret;
 	}
 	
 	public static void send(NetworkGroup target, PaxosMessage msg){

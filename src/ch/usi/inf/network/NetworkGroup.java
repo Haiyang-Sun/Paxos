@@ -20,7 +20,10 @@ public class NetworkGroup {
 	public void setPort(int port) {
 		this.port = port;
 	}
-	
+	@Override
+	public int hashCode() {
+		return groupName.hashCode()+port;
+	}
 	@Override
 	public String toString(){
 		return "("+groupName+","+port+")";
