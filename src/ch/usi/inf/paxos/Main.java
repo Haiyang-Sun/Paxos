@@ -1,5 +1,6 @@
 package ch.usi.inf.paxos;
 
+import ch.usi.inf.logging.Logger;
 import ch.usi.inf.paxos.roles.Acceptor;
 import ch.usi.inf.paxos.roles.Client;
 import ch.usi.inf.paxos.roles.Learner;
@@ -17,7 +18,7 @@ public class Main {
 		String type = args[0];
 		int id = Integer.parseInt(args[1]);
 		if(!PaxosConfig.initFromFile(args[2])){
-			System.err.println("Cannot parse the configuration file");
+			Logger.error("Cannot parse the configuration file");
 			return;
 		}
 		GeneralNode node = null;
@@ -39,7 +40,7 @@ public class Main {
 			new Thread(new BackgroundThread(node)).start();
 			node.eventLoop();
 		} else {
-			System.err.println("Wrong node type specified");
+			Logger.error("Wrong node type specified");
 		}
 	}
 	

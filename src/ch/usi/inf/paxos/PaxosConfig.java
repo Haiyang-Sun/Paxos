@@ -5,11 +5,12 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.Scanner;
 
+import ch.usi.inf.logging.Logger;
 import ch.usi.inf.network.NetworkGroup;
 import ch.usi.inf.paxos.roles.Proposer;
 
 public class PaxosConfig {
-	public static boolean debug = false;
+	public static boolean debug = true;
 	public static final int NUM_ACCEPTORS = 3; 
 	public static final int NUM_QUORUM = 2; 
 	
@@ -20,8 +21,12 @@ public class PaxosConfig {
 	public enum NetworkLevel {NORMAL};
 	static NetworkLevel networkLevel = NetworkLevel.NORMAL;
 	public static boolean extraThreadDispatching = true;
-	public static long decisionBroadcastIntervalMilisecs = 5000;
-	public static long timeoutMilisecs = 10000;
+	public static long decisionBroadcastIntervalMilisecs = 3000;
+	public static long timeoutMilisecs = 1000;
+	public static int randomSleep = 100;
+	public static long clientBroadCastTime = 5000;
+	public static long fetchEventInterval = 1000; //wait time when the event list is empty
+	public static long timeoutCheckInterval = timeoutMilisecs / 2;
 	public static boolean initFromFile(String path){
 		try {
 			File file = new File(path);
@@ -48,7 +53,7 @@ public class PaxosConfig {
 				}
 			}catch (Exception e){
 				e.printStackTrace();
-				System.err.println("Error input format");
+				Logger.error("Error input format");
 				return false;
 			}
 		} catch (FileNotFoundException e) {

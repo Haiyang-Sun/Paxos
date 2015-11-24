@@ -3,6 +3,7 @@ package ch.usi.inf.paxos.messages;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
+import ch.usi.inf.logging.Logger;
 import ch.usi.inf.network.BaseMulticast;
 import ch.usi.inf.network.Multicast;
 import ch.usi.inf.network.NetworkGroup;
@@ -69,10 +70,8 @@ public class PaxosMessenger {
 	}
 	
 	public static void send(NetworkGroup target, PaxosMessage msg){
-		randomSleep(1000);
-		if(PaxosConfig.debug)
-			System.out.println("Send message "+msg.toString()+" to "+target);
-		
+		randomSleep(PaxosConfig.randomSleep);
+		Logger.debug("Send message "+msg.toString()+" to "+target);
 		getMulticast(target).send(msg.getMessageBytes());
 	}
 	
@@ -144,10 +143,9 @@ public class PaxosMessenger {
 				res = new PaxosDecisionMessage(Proposer.getById(nodeId), slotIndex, new ValueType(valueBuf), msgId);
 				break;
 			case MSG_UNKONWN:
-				System.err.println("Unknown message is received");
+				Logger.error("Unknown message is received");
 		}
-		if(PaxosConfig.debug)
-			System.out.println("Received message "+res.toString());
+		Logger.debug("Received message "+res.toString());
 		return res;
 	}
 	

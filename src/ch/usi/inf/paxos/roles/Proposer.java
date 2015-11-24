@@ -2,11 +2,14 @@ package ch.usi.inf.paxos.roles;
 
 import java.io.IOException;
 import java.nio.CharBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -14,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 
+import ch.usi.inf.logging.Logger;
 import ch.usi.inf.network.NetworkGroup;
 import ch.usi.inf.paxos.GeneralNode;
 import ch.usi.inf.paxos.PaxosConfig;
@@ -31,12 +35,18 @@ import ch.usi.inf.paxos.messages.proposer.PaxosPhase2AMessage;
 
 public class Proposer extends GeneralNode{
 
-	ConcurrentHashMap<PaxosMessage, Boolean> events = new ConcurrentHashMap<PaxosMessage, Boolean>(); 
-	ArrayList<PaxosMessage> eventArray = new ArrayList<PaxosMessage>();
+	//ConcurrentHashMap<PaxosMessage, Boolean> events = new ConcurrentHashMap<PaxosMessage, Boolean>(); 
+	Queue<PaxosMessage> eventArray = new ArrayDeque<PaxosMessage>();
 	ConcurrentHashMap<Integer, ValueType> c_vals = new ConcurrentHashMap<Integer, ValueType>();
 	ConcurrentHashMap<Integer, Long> c_rnds = new ConcurrentHashMap<Integer, Long>();
 	ConcurrentHashMap<Integer, ValueType> decisions = new ConcurrentHashMap<Integer, ValueType>();
 	MessageTimeoutManager timeoutManager = new MessageTimeoutManager(this);
+	ConcurrentHashMap<Integer, PaxosPhase1AMessage> phase1ACaches = new ConcurrentHashMap<Integer, PaxosPhase1AMessage>();
+	ConcurrentHashMap<Integer, HashSet<PaxosMessage>> phase1AResponses = new ConcurrentHashMap<Integer, HashSet<PaxosMessage>>();
+	ConcurrentHashMap<Integer, PaxosPhase2AMessage> phase2ACaches = new ConcurrentHashMap<Integer, PaxosPhase2AMessage>();
+	ConcurrentHashMap<Integer, HashSet<PaxosMessage>> phase2AResponses = new ConcurrentHashMap<Integer, HashSet<PaxosMessage>>();
+	
+	static ConcurrentHashMap<Integer, Proposer> instances = new ConcurrentHashMap<Integer, Proposer>();
 	public Proposer(int id, NetworkGroup networkGroup) {
 		super(id, networkGroup);
 		//background thread to broadcast decisions all the time
@@ -76,18 +86,18 @@ public class Proposer extends GeneralNode{
 		PaxosPhase1BMessage phase1BMsg = (PaxosPhase1BMessage)msg;
 		int slot = msg.getSlotIndex();
 		if(!phase1ACaches.containsKey(slot)){
-			System.err.println("not possible to receive phase1B without having sent phase1A in the leader or this is not the leader");
+			Logger.error("not possible to receive phase1B without having sent phase1A in the leader or this is not the leader");
 			return;
 		}
 		Long c_rnd = c_rnds.get(slot);
 		PaxosPhase1AMessage phase1AMsg = phase1ACaches.get(slot);
 		if(phase1AMsg.getC_rnd() != c_rnd){
-			System.err.println("cached phase1A message mismatches with cached c_rnd");
+			Logger.error("cached phase1A message mismatches with cached c_rnd");
 			return;
 		}
 		//if(!phase1FinishedAtThisMoment(slot))){
 		if(phase1BMsg.getRnd() > c_rnd) {
-			System.err.println("Not possible phase1B rnd value bigger than leader's c_rnd");
+			Logger.error("Not possible phase1B rnd value bigger than leader's c_rnd");
 		} else if(phase1BMsg.getRnd() == c_rnd) {
 			HashSet<PaxosMessage> tmp = new HashSet<PaxosMessage>();
 			HashSet<PaxosMessage> received = phase1AResponses.putIfAbsent(slot, tmp);
@@ -133,20 +143,20 @@ public class Proposer extends GeneralNode{
 		PaxosPhase2BMessage phase2BMsg = (PaxosPhase2BMessage)msg;
 		int slot = msg.getSlotIndex();
 		if(!phase2ACaches.containsKey(slot)){
-			System.err.println("not possible to receive phase2B without having sent phase2A in the leader or this is not the leader");
+			Logger.error("not possible to receive phase2B without having sent phase2A in the leader or this is not the leader");
 			return;
 		}
 		Long c_rnd = c_rnds.get(slot);
 		PaxosPhase2AMessage phase2AMsg = phase2ACaches.get(slot);
 		if(phase2AMsg.getC_rnd() != c_rnd){
-			System.err.println("cached phase2A message mismatches with cached c_rnd");
+			Logger.error("cached phase2A message mismatches with cached c_rnd");
 			return;
 		}
 		if(phase2BMsg.getV_rnd() < c_rnd){
 			//old message, omit
 			return;
 		}else if(phase2BMsg.getV_rnd() > c_rnd){
-			System.err.println("not possible for phase2B message with v-rnd bigger than leader's");
+			Logger.error("not possible for phase2B message with v-rnd bigger than leader's");
 			return;
 		}
 		HashSet<PaxosMessage> tmp = new HashSet<PaxosMessage>();
@@ -157,12 +167,12 @@ public class Proposer extends GeneralNode{
 		if(gotMajority(received)){
 			timeoutManager.remove(phase2AMsg);
 			if(decisions.containsKey(slot) && !decisions.get(slot).equals(phase2BMsg.getV_val())){
-				System.err.println("different decision made for slot "+slot+" at proposer "+this.getId());
+				Logger.error("different decision made for slot "+slot+" at proposer "+this.getId());
 				return;
 			}
 			decisions.put(slot, phase2BMsg.getV_val());
 			sendDecision(slot, phase2BMsg.getV_val());
-			System.out.println("Decision for slot "+slot+" "+phase2BMsg.getV_val());
+			Logger.info("Decision for slot "+slot+" "+ new String(phase2BMsg.getV_val().getValue(), StandardCharsets.UTF_8));
 		}
 	}
 	
@@ -189,13 +199,12 @@ public class Proposer extends GeneralNode{
 	/*
 	 * check timeout for each sent messages (Phase1A, Phase2A), and resend
 	 */
-	static long waitMilisecs = PaxosConfig.timeoutMilisecs/5;
 	@Override
 	public void backgroundLoop(){
 		while(true){
 			timeoutManager.check();
 			try {
-				Thread.sleep(waitMilisecs);
+				Thread.sleep(PaxosConfig.timeoutCheckInterval);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -207,43 +216,16 @@ public class Proposer extends GeneralNode{
 	public void eventLoop(){
 		while(true){
 			PaxosMessage msg = PaxosMessenger.recv(this.getNetworkGroup());
-			Boolean existing = events.putIfAbsent(msg, true);
-			if(existing == null){
-				/*
-				 * TODO
-				 * create a separated thread to dispatch event, so that the receiving thread can receive most of the messages
-				 */
-				if(PaxosConfig.extraThreadDispatching)
-					eventArray.add(msg);
-				else
-					dispatchEvent(msg);
-			}
+			//Boolean existing = events.putIfAbsent(msg, true);
+			//if(existing == null){
+			if(PaxosConfig.extraThreadDispatching)
+				eventArray.add(msg);
+			else
+				dispatchEvent(msg);
+			//}
 		}
 	}
 	
-	static class DispatchThread implements Runnable{
-		Proposer proposer;
-		public DispatchThread(Proposer proposer) {
-			super();
-			this.proposer = proposer;
-		}
-		@Override
-		public void run() {
-			int index = 0;
-			while(true){
-				while(index >= proposer.eventArray.size()) {
-					try {
-						Thread.sleep(200);
-					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-				}
-				proposer.dispatchEvent(proposer.eventArray.get(index));
-				index++;
-			}
-		}
-	}
 	static class DecisionBroadcastThread implements Runnable{
 		Proposer proposer;
 		public DecisionBroadcastThread(Proposer proposer) {
@@ -266,10 +248,7 @@ public class Proposer extends GeneralNode{
 		}
 	}
 	
-	ConcurrentHashMap<Integer, PaxosPhase1AMessage> phase1ACaches = new ConcurrentHashMap<Integer, PaxosPhase1AMessage>();
-	ConcurrentHashMap<Integer, HashSet<PaxosMessage>> phase1AResponses = new ConcurrentHashMap<Integer, HashSet<PaxosMessage>>();
-	ConcurrentHashMap<Integer, PaxosPhase2AMessage> phase2ACaches = new ConcurrentHashMap<Integer, PaxosPhase2AMessage>();
-	ConcurrentHashMap<Integer, HashSet<PaxosMessage>> phase2AResponses = new ConcurrentHashMap<Integer, HashSet<PaxosMessage>>();
+	
 	public void dispatchEvent(PaxosMessage msg){
 		Proposer leader = LeaderOracle.getLeader();
 		//if(leader == null || leader.getId() != this.getId()){
@@ -303,19 +282,16 @@ public class Proposer extends GeneralNode{
 	}
 
 	long lastCRand = 0; //verify incre
-	
 	synchronized private long incrementAndGetCRnd(int slot) {
 		long time = System.nanoTime();
 		long res = (time >> 8 << 8) | this.getId();
 		
 		c_rnds.put(slot, res);
 		if(res <= lastCRand)
-			System.err.println("the round number generated is not increasing all the time");
+			Logger.error("the round number generated is not increasing all the time");
 		lastCRand = res;
 		return res;
 	}
-
-	static ConcurrentHashMap<Integer, Proposer> instances = new ConcurrentHashMap<Integer, Proposer>();  
 	
 	public static Proposer getById(int id){
 		Proposer tmp = new Proposer(id, PaxosConfig.getProposerNetwork());
@@ -357,5 +333,13 @@ public class Proposer extends GeneralNode{
 		//	// TODO Auto-generated catch block
 		//	e.printStackTrace();
 		//}
+	}
+	@Override
+	public boolean hasNextEvent(){
+		return !eventArray.isEmpty();
+	}
+	@Override
+	public PaxosMessage nextEvent(){
+		return eventArray.poll();
 	}
 }

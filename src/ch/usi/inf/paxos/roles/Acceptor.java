@@ -1,13 +1,16 @@
 package ch.usi.inf.paxos.roles;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Random;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
 import ch.usi.inf.network.NetworkGroup;
 import ch.usi.inf.paxos.GeneralNode;
 import ch.usi.inf.paxos.PaxosConfig;
 import ch.usi.inf.paxos.ValueType;
+import ch.usi.inf.paxos.GeneralNode.DispatchThread;
 import ch.usi.inf.paxos.GeneralNode.NodeType;
 import ch.usi.inf.paxos.messages.PaxosMessage;
 import ch.usi.inf.paxos.messages.PaxosMessenger;
@@ -22,12 +25,15 @@ public class Acceptor extends GeneralNode{
 	ConcurrentHashMap<Integer, Long> rnds = new ConcurrentHashMap<Integer, Long>();
 	ConcurrentHashMap<Integer, Long> v_rnds = new ConcurrentHashMap<Integer, Long>();
 	ConcurrentHashMap<Integer, ValueType> v_vals = new ConcurrentHashMap<Integer, ValueType>();
+	static ConcurrentHashMap<Integer, Acceptor> instances = new ConcurrentHashMap<Integer, Acceptor>();
+	//HashSet<PaxosMessage> events = new HashSet<PaxosMessage>();
+	Queue<PaxosMessage> eventArray = new ArrayDeque<PaxosMessage>();
 	
 	public Acceptor(int id, NetworkGroup networkGroup) {
 		super(id, networkGroup);
+		if(PaxosConfig.extraThreadDispatching)
+			new Thread(new DispatchThread(this)).start();
 	}
-	
-	static ConcurrentHashMap<Integer, Acceptor> instances = new ConcurrentHashMap<Integer, Acceptor>();  
 	
 	public static Acceptor getById(int id){
 		Acceptor tmp = new Acceptor(id, PaxosConfig.getAcceptorNetwork());
@@ -72,23 +78,20 @@ public class Acceptor extends GeneralNode{
 		PaxosMessenger.send(PaxosConfig.getProposerNetwork(), msg);
 	}
 	
-	HashSet<PaxosMessage> events = new HashSet<PaxosMessage>();
-	
 	@Override
 	public void eventLoop(){
 		while(true){
 			PaxosMessage msg = PaxosMessenger.recv(this.getNetworkGroup());
-			if(!events.contains(msg)){
-				events.add(msg);
-				/*
-				 * TODO
-				 * create a separated thread to dispatch event, so that the receiving thread can receive most of the messages
-				 */
+			//if(!events.contains(msg)){
+			//	events.add(msg);
+			if(PaxosConfig.extraThreadDispatching)
+				eventArray.add(msg);
+			else
 				dispatchEvent(msg);
-			}
+			//}
 		}
 	}
-	
+	@Override
 	public void dispatchEvent(PaxosMessage msg){
 			switch (msg.getType()){
 				case MSG_PROPOSER_PHASE1A:
@@ -103,5 +106,14 @@ public class Acceptor extends GeneralNode{
 	@Override
 	public NodeType getNodeType() {
 		return NodeType.ACCEPTOR;
+	}
+	
+	@Override
+	public boolean hasNextEvent(){
+		return !eventArray.isEmpty();
+	}
+	@Override
+	public PaxosMessage nextEvent(){
+		return eventArray.poll();
 	}
 }

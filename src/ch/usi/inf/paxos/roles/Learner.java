@@ -1,8 +1,11 @@
 package ch.usi.inf.paxos.roles;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
 
+import ch.usi.inf.logging.Logger;
 import ch.usi.inf.network.NetworkGroup;
 import ch.usi.inf.paxos.GeneralNode;
 import ch.usi.inf.paxos.PaxosConfig;
@@ -13,26 +16,27 @@ import ch.usi.inf.paxos.messages.PaxosMessenger;
 import ch.usi.inf.paxos.messages.proposer.PaxosDecisionMessage;
 
 public class Learner extends GeneralNode {
+	ConcurrentHashMap<Integer, ValueType> values = new ConcurrentHashMap<Integer, ValueType>();
+	int toOutputSlot = 0;
+	static ConcurrentHashMap<Integer, Learner> instances = new ConcurrentHashMap<Integer, Learner>();
 	public Learner(int id, NetworkGroup networkGroup) {
 		super(id, networkGroup);
 	}
 
-	ConcurrentHashMap<Integer, ValueType> values = new ConcurrentHashMap<Integer, ValueType>();
-	int toOutputSlot = 0;
 	public void onLearnValue(int slot, ValueType value){
+		if(slot < toOutputSlot)
+			return;
 		ValueType existing = values.putIfAbsent(slot, value);
 		if(existing != null && !existing.equals(value)){
-			System.err.println("receive different decision for slot "+slot);
+			Logger.error("receive different decision for slot "+slot);
 		}
 		while(values.containsKey(toOutputSlot)){
-			System.out.println(values.get(toOutputSlot));
+			String res = new String(values.get(toOutputSlot).getValue(), StandardCharsets.UTF_8);
+			Logger.info(res);
 			toOutputSlot++;
 		}
-		if(PaxosConfig.debug)
-			System.out.println("waiting for slot "+toOutputSlot+"'s decision");
+		Logger.debug("waiting for slot "+toOutputSlot+"'s decision");
 	}
-	
-	static ConcurrentHashMap<Integer, Learner> instances = new ConcurrentHashMap<Integer, Learner>();  
 	
 	public static Learner getById(int id){
 		Learner tmp = new Learner(id, PaxosConfig.getLearnerNetwork());
@@ -43,15 +47,11 @@ public class Learner extends GeneralNode {
 			return res;
 	}
 	
-	HashSet<PaxosMessage> events = new HashSet<PaxosMessage>();
 	@Override
 	public void eventLoop(){
 		while(true){
 			PaxosMessage msg = PaxosMessenger.recv(this.getNetworkGroup());
-			if(!events.contains(msg)){
-				events.add(msg);
-				dispatchEvent(msg);
-			}
+			dispatchEvent(msg);
 		}
 	}
 	

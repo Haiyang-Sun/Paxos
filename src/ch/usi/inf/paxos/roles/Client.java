@@ -13,10 +13,12 @@ import ch.usi.inf.paxos.messages.PaxosMessenger;
 import ch.usi.inf.paxos.messages.client.PaxosClientMessage;
 
 public class Client extends GeneralNode{
+	static ConcurrentHashMap<Integer, Client> instances = new ConcurrentHashMap<Integer, Client>();
+	ArrayList<ValueType> inputValues = new ArrayList<ValueType>();
 	Client(int id, NetworkGroup networkGroup) {
 		super(id, networkGroup);
 	}
-
+	
 	/* 
 	 * send every value read from stdandard input to proposers
 	 * there is no guarantee that the value proposed will be received by any proposer
@@ -25,10 +27,8 @@ public class Client extends GeneralNode{
 		PaxosMessenger.send(PaxosConfig.getProposerNetwork(), new PaxosClientMessage(this, value, slotIdx));
 	}
 	
-	ArrayList<ValueType> inputValues = new ArrayList<ValueType>();
-	
 	/*
-	 * in case the client messages got lost, we broadcast all input values every 2000 secs
+	 * in case the client messages got lost, we broadcast all input values periodically
 	 * proposers will ignore these messages if they have been already received 
 	 */
 	@Override
@@ -38,7 +38,7 @@ public class Client extends GeneralNode{
 				propose(inputValues.get(i),i);
 			}
 			try {
-				Thread.sleep(10000);
+				Thread.sleep(PaxosConfig.clientBroadCastTime);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -59,8 +59,6 @@ public class Client extends GeneralNode{
 			cnt++;
 		}
 	}
-	
-	static ConcurrentHashMap<Integer, Client> instances = new ConcurrentHashMap<Integer, Client>();  
 	
 	public static Client getById(int id){
 		Client tmp = new Client(id, PaxosConfig.getClientNetwork());
