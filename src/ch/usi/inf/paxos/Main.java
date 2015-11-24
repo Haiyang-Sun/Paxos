@@ -27,10 +27,10 @@ public class Main {
 				node = Client.getById(id);
 				break;
 			case "proposer":
-				node = Proposer.getById(id);
+				node = Proposer.getById(id, PaxosConfig.extraThreadDispatching);
 				break;
 			case "acceptor":
-				node = Acceptor.getById(id);
+				node = Acceptor.getById(id, PaxosConfig.extraThreadDispatching);
 				break;
 			case "learner":
 				node = Learner.getById(id);

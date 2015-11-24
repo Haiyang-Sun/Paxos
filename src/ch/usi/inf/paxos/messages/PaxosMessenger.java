@@ -26,7 +26,7 @@ import ch.usi.inf.paxos.roles.Proposer;
 
 public class PaxosMessenger {
 	
-	public static int MAX_PACKET_LENGTH = 50000;
+	public static int MAX_PACKET_LENGTH = 1000;
 	
 	public enum MessageType{MSG_CLIENT, MSG_PROPOSER_PHASE1A, MSG_PROPOSER_PHASE2A,MSG_ACCEPTOR_PHASE1B,MSG_ACCEPTOR_PHASE2B, MSG_PROPOER_DECIDE, MSG_UNKONWN};
 	
