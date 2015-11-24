@@ -29,9 +29,9 @@ public class Acceptor extends GeneralNode{
 	//HashSet<PaxosMessage> events = new HashSet<PaxosMessage>();
 	Queue<PaxosMessage> eventArray = new ArrayDeque<PaxosMessage>();
 	
-	public Acceptor(int id, NetworkGroup networkGroup, boolean dispatchThread) {
+	public Acceptor(int id, NetworkGroup networkGroup, boolean realInstance) {
 		super(id, networkGroup);
-		if(dispatchThread)
+		if(realInstance && PaxosConfig.extraThreadDispatching)
 			new Thread(new DispatchThread(this)).start();
 	}
 	
@@ -39,8 +39,8 @@ public class Acceptor extends GeneralNode{
 	public static Acceptor getById(int id){
 		return getById(id, false);
 	}
-	public static Acceptor getById(int id, boolean dispatchThread){
-		Acceptor tmp = new Acceptor(id, PaxosConfig.getAcceptorNetwork(), dispatchThread);
+	public static Acceptor getById(int id, boolean realInstance){
+		Acceptor tmp = new Acceptor(id, PaxosConfig.getAcceptorNetwork(), realInstance);
 		Acceptor res = instances.putIfAbsent(id, tmp);
 		if(res == null)
 			return tmp;

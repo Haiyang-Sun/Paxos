@@ -47,11 +47,12 @@ public class Proposer extends GeneralNode{
 	ConcurrentHashMap<Integer, HashSet<PaxosMessage>> phase2AResponses = new ConcurrentHashMap<Integer, HashSet<PaxosMessage>>();
 	
 	static ConcurrentHashMap<Integer, Proposer> instances = new ConcurrentHashMap<Integer, Proposer>();
-	public Proposer(int id, NetworkGroup networkGroup, boolean dispatchThread) {
+	public Proposer(int id, NetworkGroup networkGroup, boolean realInstance) {
 		super(id, networkGroup);
 		//background thread to broadcast decisions all the time
-		new Thread(new DecisionBroadcastThread(this)).start();
-		if(dispatchThread)
+		if(realInstance)
+			new Thread(new DecisionBroadcastThread(this)).start();
+		if(realInstance && PaxosConfig.extraThreadDispatching)
 			new Thread(new DispatchThread(this)).start();
 	}
 
@@ -297,8 +298,8 @@ public class Proposer extends GeneralNode{
 		return getById(id, false);
 	}
 	
-	public static Proposer getById(int id, boolean dispatchThread){
-		Proposer tmp = new Proposer(id, PaxosConfig.getProposerNetwork(), dispatchThread);
+	public static Proposer getById(int id, boolean realInstance){
+		Proposer tmp = new Proposer(id, PaxosConfig.getProposerNetwork(), realInstance);
 		Proposer res = instances.putIfAbsent(id, tmp);
 		if(res == null)
 			return tmp;
