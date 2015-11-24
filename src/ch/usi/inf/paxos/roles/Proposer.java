@@ -171,9 +171,11 @@ public class Proposer extends GeneralNode{
 				Logger.error("different decision made for slot "+slot+" at proposer "+this.getId());
 				return;
 			}
-			decisions.put(slot, phase2BMsg.getV_val());
-			sendDecision(slot, phase2BMsg.getV_val());
-			Logger.info("Decision for slot "+slot+" "+ new String(phase2BMsg.getV_val().getValue(), StandardCharsets.UTF_8));
+			if(!decisions.containsKey(slot)){
+				decisions.put(slot, phase2BMsg.getV_val());
+				sendDecision(slot, phase2BMsg.getV_val());
+				Logger.info("Decision for slot "+slot+" "+ new String(phase2BMsg.getV_val().getValue(), StandardCharsets.UTF_8));
+			}
 		}
 	}
 	

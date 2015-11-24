@@ -21,7 +21,7 @@ public class PaxosConfig {
 	public enum NetworkLevel {NORMAL};
 	static NetworkLevel networkLevel = NetworkLevel.NORMAL;
 	public static boolean extraThreadDispatching = true;
-	public static long decisionBroadcastIntervalMilisecs = 3000;
+	public static long decisionBroadcastIntervalMilisecs = 2000;
 	public static long timeoutMilisecs = 1000;
 	public static int randomSleep = 100;
 	public static long clientBroadCastTime = 5000;
