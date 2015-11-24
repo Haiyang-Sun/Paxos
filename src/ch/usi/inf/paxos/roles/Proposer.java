@@ -173,9 +173,9 @@ public class Proposer extends GeneralNode{
 			}
 			if(!decisions.containsKey(slot)){
 				decisions.put(slot, phase2BMsg.getV_val());
-				sendDecision(slot, phase2BMsg.getV_val());
 				Logger.info("Decision for slot "+slot+" "+ new String(phase2BMsg.getV_val().getValue(), StandardCharsets.UTF_8));
 			}
+			sendDecision(slot, phase2BMsg.getV_val());
 		}
 	}
 	
