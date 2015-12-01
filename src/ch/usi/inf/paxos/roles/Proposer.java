@@ -29,6 +29,8 @@ import ch.usi.inf.paxos.messages.PaxosMessenger;
 import ch.usi.inf.paxos.messages.acceptor.PaxosPhase1BMessage;
 import ch.usi.inf.paxos.messages.acceptor.PaxosPhase2BMessage;
 import ch.usi.inf.paxos.messages.client.PaxosClientMessage;
+import ch.usi.inf.paxos.messages.leader.PaxosAskForLeaderMessage;
+import ch.usi.inf.paxos.messages.leader.PaxosNewLeaderMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosDecisionMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosPhase1AMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosPhase2AMessage;
@@ -112,9 +114,12 @@ public class Proposer extends GeneralNode{
 
 	@Override
 	public void dispatchEvent(PaxosMessage msg){
-		Proposer leader = leaderOracle.getLeader();
-		//if(leader == null || leader.getId() != this.getId()){
-		if(false){
+		if(leaderOracle.getLeader() == null){
+			leaderOracle.runForLeader();
+		}
+		if(!leaderOracle.selfIsLeader()){
+//		if(false){
+			//do nothing, because the leader should work
 			
 		}else {
 			int slot = msg.getSlotIndex();
@@ -127,6 +132,12 @@ public class Proposer extends GeneralNode{
 					break;
 				case MSG_ACCEPTOR_PHASE2B:
 					onReceivePhase2B(msg);
+					break;
+				case MSG_ACCEPTOR_ASK_FOR_LEADER:
+					leaderOracle.onAskForLeader((PaxosAskForLeaderMessage) msg);
+					break;
+				case MSG_ACCEPTOR_CURRENT_LEADER:
+					leaderOracle.onReceiveLeaderInfo((PaxosNewLeaderMessage) msg);
 					break;
 			}
 		}
@@ -318,21 +329,6 @@ public class Proposer extends GeneralNode{
 	
 	boolean phase1FinishedAtThisMoment(int slot){
 		return phase2ACaches.containsKey(slot) && phase2ACaches.get(slot).getC_rnd() == c_rnds.get(slot);
-	}
-	
-	public class LeaderOracle {
-		Proposer self;
-		LeaderOracle(Proposer self){
-			this.self = self;
-		}
-		
-		Proposer leader;
-		public void runForLeader(Proposer node){
-			
-		}
-		public Proposer getLeader(){
-			return leader;
-		}
 	}
 	
 	static class DecisionBroadcastThread implements Runnable{

@@ -19,7 +19,6 @@ import ch.usi.inf.paxos.messages.acceptor.PaxosPhase2BMessage;
 import ch.usi.inf.paxos.messages.client.PaxosClientMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosPhase1AMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosPhase2AMessage;
-import ch.usi.inf.paxos.roles.Proposer.LeaderOracle;
 
 public class Acceptor extends GeneralNode{
 	ConcurrentHashMap<Integer, Long> rnds = new ConcurrentHashMap<Integer, Long>();

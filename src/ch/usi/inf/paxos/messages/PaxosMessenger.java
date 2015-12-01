@@ -17,6 +17,9 @@ import ch.usi.inf.paxos.PaxosConfig.NetworkLevel;
 import ch.usi.inf.paxos.messages.acceptor.PaxosPhase1BMessage;
 import ch.usi.inf.paxos.messages.acceptor.PaxosPhase2BMessage;
 import ch.usi.inf.paxos.messages.client.PaxosClientMessage;
+import ch.usi.inf.paxos.messages.leader.PaxosAskForLeaderMessage;
+import ch.usi.inf.paxos.messages.leader.PaxosNewLeaderMessage;
+import ch.usi.inf.paxos.messages.leader.PaxosRunForLeaderMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosDecisionMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosPhase1AMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosPhase2AMessage;
@@ -28,7 +31,7 @@ public class PaxosMessenger {
 	
 	public static int MAX_PACKET_LENGTH = 1000;
 	
-	public enum MessageType{MSG_CLIENT, MSG_PROPOSER_PHASE1A, MSG_PROPOSER_PHASE2A,MSG_ACCEPTOR_PHASE1B,MSG_ACCEPTOR_PHASE2B, MSG_PROPOER_DECIDE, MSG_UNKONWN};
+	public enum MessageType{MSG_CLIENT, MSG_PROPOSER_PHASE1A, MSG_PROPOSER_PHASE2A,MSG_ACCEPTOR_PHASE1B,MSG_ACCEPTOR_PHASE2B, MSG_PROPOSER_DECIDE, MSG_ACCEPTOR_ASK_FOR_LEADER, MSG_ACCEPTOR_CURRENT_LEADER, MSG_PROPOSER_RUN_FOR_LEADER, MSG_UNKONWN, MSG_PROPOSER_LEADER_HEARTBEAT};
 	
 	public static byte msgType2Byte(MessageType type){
 		switch(type){
@@ -42,8 +45,16 @@ public class PaxosMessenger {
 				return 3;
 			case MSG_ACCEPTOR_PHASE2B:
 				return 4;
-			case MSG_PROPOER_DECIDE:
+			case MSG_PROPOSER_DECIDE:
 				return 5;
+			case MSG_PROPOSER_RUN_FOR_LEADER:
+				return 6;
+			case MSG_ACCEPTOR_ASK_FOR_LEADER:
+				return 7;
+			case MSG_ACCEPTOR_CURRENT_LEADER:
+				return 8;
+			case MSG_PROPOSER_LEADER_HEARTBEAT:
+				return 9;
 		}
 		return -1;
 	}
@@ -61,7 +72,15 @@ public class PaxosMessenger {
 			case 4:
 				return MessageType.MSG_ACCEPTOR_PHASE2B;
 			case 5:
-				return MessageType.MSG_PROPOER_DECIDE;
+				return MessageType.MSG_PROPOSER_DECIDE;
+			case 6:
+				return MessageType.MSG_PROPOSER_RUN_FOR_LEADER;
+			case 7:
+				return MessageType.MSG_ACCEPTOR_ASK_FOR_LEADER;
+			case 8:
+				return MessageType.MSG_ACCEPTOR_CURRENT_LEADER;
+			case 9:
+				return MessageType.MSG_PROPOSER_LEADER_HEARTBEAT;
 		}
 		return MessageType.MSG_UNKONWN;
 	}
@@ -117,6 +136,7 @@ public class PaxosMessenger {
 		int position;
 		
 		long v1,v2;
+		int i1,i2;
 		switch(type){
 			case MSG_CLIENT:
 				position = buf.position();
@@ -149,12 +169,24 @@ public class PaxosMessenger {
 				buf.get(valueBuf, 0, size - position);
 				res = new PaxosPhase2BMessage(Acceptor.getById(nodeId), slotIndex, v1, new ValueType(valueBuf), msgId);
 				break;
-			case MSG_PROPOER_DECIDE:
+			case MSG_PROPOSER_DECIDE:
 				position = buf.position();
 				valueBuf = new byte[size - position];
 				buf.get(valueBuf, 0, size - position);
 				res = new PaxosDecisionMessage(Proposer.getById(nodeId), slotIndex, new ValueType(valueBuf), msgId);
 				break;
+			case MSG_PROPOSER_RUN_FOR_LEADER:
+				res = new PaxosRunForLeaderMessage(Proposer.getById(nodeId));
+				break;
+			case MSG_ACCEPTOR_ASK_FOR_LEADER:
+				res = new PaxosAskForLeaderMessage(Acceptor.getById(nodeId));
+				break;
+			case MSG_ACCEPTOR_CURRENT_LEADER:
+				i1 = buf.getInt();
+				i2 = buf.getInt();
+				res = new PaxosNewLeaderMessage(Acceptor.getById(nodeId), Proposer.getById(i1), i2);
+				break;
+			case MSG_PROPOSER_LEADER_HEARTBEAT:
 			case MSG_UNKONWN:
 				Logger.error("Unknown message is received");
 		}

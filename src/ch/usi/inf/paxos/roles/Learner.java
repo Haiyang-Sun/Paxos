@@ -58,7 +58,7 @@ public class Learner extends GeneralNode {
 	public void dispatchEvent(PaxosMessage msg){
 		int slot = msg.getSlotIndex();
 		switch (msg.getType()){
-			case MSG_PROPOER_DECIDE:
+			case MSG_PROPOSER_DECIDE:
 				PaxosDecisionMessage decisionMsg = (PaxosDecisionMessage) msg;
 				onLearnValue(slot, decisionMsg.getDecision());
 				break;

@@ -33,7 +33,7 @@ public class PaxosDecisionMessage extends PaxosMessage {
 	@Override
 	public ByteBuffer getMessageBytes(){
 		ByteBuffer bytes = ByteBuffer.allocate(PaxosMessenger.MAX_PACKET_LENGTH);
-		bytes.put(PaxosMessenger.msgType2Byte(MessageType.MSG_PROPOER_DECIDE));
+		bytes.put(PaxosMessenger.msgType2Byte(MessageType.MSG_PROPOSER_DECIDE));
 		bytes.putInt(proposer.getId());
 		bytes.putInt(slotIndex);
 		bytes.putInt(msgId);
@@ -43,7 +43,7 @@ public class PaxosDecisionMessage extends PaxosMessage {
 	
 	@Override
 	public MessageType getType(){
-		return MessageType.MSG_PROPOER_DECIDE;
+		return MessageType.MSG_PROPOSER_DECIDE;
 	}
 
 }
