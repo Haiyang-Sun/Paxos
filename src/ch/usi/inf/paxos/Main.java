@@ -27,10 +27,10 @@ public class Main {
 				node = Client.getById(id);
 				break;
 			case "proposer":
-				node = Proposer.getById(id, true);
+				node = Proposer.getById(id);
 				break;
 			case "acceptor":
-				node = Acceptor.getById(id, true);
+				node = Acceptor.getById(id);
 				break;
 			case "learner":
 				node = Learner.getById(id);

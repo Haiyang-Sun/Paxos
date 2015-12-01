@@ -29,18 +29,18 @@ public class Acceptor extends GeneralNode{
 	//HashSet<PaxosMessage> events = new HashSet<PaxosMessage>();
 	Queue<PaxosMessage> eventArray = new ArrayDeque<PaxosMessage>();
 	
-	public Acceptor(int id, NetworkGroup networkGroup, boolean realInstance) {
+	public Acceptor(int id, NetworkGroup networkGroup) {
 		super(id, networkGroup);
-		if(realInstance && PaxosConfig.extraThreadDispatching)
+	}
+	
+	@Override
+	public void backgroundLoop(){
+		if(PaxosConfig.extraThreadDispatching)
 			new Thread(new DispatchThread(this)).start();
 	}
 	
-	
 	public static Acceptor getById(int id){
-		return getById(id, false);
-	}
-	public static Acceptor getById(int id, boolean realInstance){
-		Acceptor tmp = new Acceptor(id, PaxosConfig.getAcceptorNetwork(), realInstance);
+		Acceptor tmp = new Acceptor(id, PaxosConfig.getAcceptorNetwork());
 		Acceptor res = instances.putIfAbsent(id, tmp);
 		if(res == null)
 			return tmp;

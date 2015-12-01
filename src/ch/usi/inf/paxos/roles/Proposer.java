@@ -35,27 +35,137 @@ import ch.usi.inf.paxos.messages.proposer.PaxosPhase2AMessage;
 
 public class Proposer extends GeneralNode{
 
-	//ConcurrentHashMap<PaxosMessage, Boolean> events = new ConcurrentHashMap<PaxosMessage, Boolean>(); 
+	/* queue of messages received */
 	Queue<PaxosMessage> eventArray = new ArrayDeque<PaxosMessage>();
+	
+	/*
+	 * manager to trigger resending of messages when timeout happens
+	 * callback on onTimeout 
+	 */
+	MessageTimeoutManager timeoutManager = new MessageTimeoutManager(this);
+	
+	/* 
+	 * The values proposer holds per slot
+	 */
 	ConcurrentHashMap<Integer, ValueType> c_vals = new ConcurrentHashMap<Integer, ValueType>();
 	ConcurrentHashMap<Integer, Long> c_rnds = new ConcurrentHashMap<Integer, Long>();
 	ConcurrentHashMap<Integer, ValueType> decisions = new ConcurrentHashMap<Integer, ValueType>();
-	MessageTimeoutManager timeoutManager = new MessageTimeoutManager(this);
+	
+	/*
+	 * The event Cache for each phase per slot
+	 */
 	ConcurrentHashMap<Integer, PaxosPhase1AMessage> phase1ACaches = new ConcurrentHashMap<Integer, PaxosPhase1AMessage>();
 	ConcurrentHashMap<Integer, HashSet<PaxosMessage>> phase1AResponses = new ConcurrentHashMap<Integer, HashSet<PaxosMessage>>();
 	ConcurrentHashMap<Integer, PaxosPhase2AMessage> phase2ACaches = new ConcurrentHashMap<Integer, PaxosPhase2AMessage>();
 	ConcurrentHashMap<Integer, HashSet<PaxosMessage>> phase2AResponses = new ConcurrentHashMap<Integer, HashSet<PaxosMessage>>();
 	
+	/*
+	 * Leader oracle 
+	 */
+	LeaderOracle leaderOracle = new LeaderOracle(this);
+	/*
+	 * singleton for each slot
+	 */
 	static ConcurrentHashMap<Integer, Proposer> instances = new ConcurrentHashMap<Integer, Proposer>();
-	public Proposer(int id, NetworkGroup networkGroup, boolean realInstance) {
+	public Proposer(int id, NetworkGroup networkGroup) {
 		super(id, networkGroup);
+	}
+	public static Proposer getById(int id){
+		Proposer tmp = new Proposer(id, PaxosConfig.getProposerNetwork());
+		Proposer res = instances.putIfAbsent(id, tmp);
+		if(res == null)
+			return tmp;
+		else
+			return res;
+	}
+	
+	/*
+	 * check timeout for each sent messages (Phase1A, Phase2A), and resend
+	 */
+	@Override
+	public void backgroundLoop(){
 		//background thread to broadcast decisions all the time
-		if(realInstance)
-			new Thread(new DecisionBroadcastThread(this)).start();
-		if(realInstance && PaxosConfig.extraThreadDispatching)
+		new Thread(new DecisionBroadcastThread(this)).start();
+		if(PaxosConfig.extraThreadDispatching)
 			new Thread(new DispatchThread(this)).start();
+		while(true){
+			timeoutManager.check();
+			try {
+				Thread.sleep(PaxosConfig.timeoutCheckInterval);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	@Override
+	public void eventLoop(){
+		while(true){
+			PaxosMessage msg = PaxosMessenger.recv(this.getNetworkGroup());
+			if(PaxosConfig.extraThreadDispatching)
+				eventArray.add(msg);
+			else
+				dispatchEvent(msg);
+		}
 	}
 
+	@Override
+	public void dispatchEvent(PaxosMessage msg){
+		Proposer leader = leaderOracle.getLeader();
+		//if(leader == null || leader.getId() != this.getId()){
+		if(false){
+			
+		}else {
+			int slot = msg.getSlotIndex();
+			switch (msg.getType()){
+				case MSG_CLIENT:
+					onReceiveClient(msg);
+					break;
+				case MSG_ACCEPTOR_PHASE1B:
+					onReceivePhase1B(msg);
+					break;
+				case MSG_ACCEPTOR_PHASE2B:
+					onReceivePhase2B(msg);
+					break;
+			}
+		}
+	}
+	
+	@Override
+	public NodeType getNodeType() {
+		return NodeType.PROPOSER;
+	}
+	
+	@Override
+	public boolean hasNextEvent(){
+		return !eventArray.isEmpty();
+	}
+	@Override
+	public PaxosMessage nextEvent(){
+		return eventArray.poll();
+	}
+
+	/*
+	 * Paxos proposer events 
+	 */
+	@Override
+	public synchronized void onTimeout(PaxosMessage record) {
+		int slot = record.getSlotIndex();
+		switch (record.getType()){
+			case MSG_PROPOSER_PHASE1A:
+				if(!phase1FinishedAtThisMoment(record.getSlotIndex()))
+					sendPhase1A(record.getSlotIndex());
+				break;
+			case MSG_PROPOSER_PHASE2A:
+				if(!decisions.containsKey(slot))
+					sendPhase2A(slot, c_rnds.get(slot), c_vals.get(slot));
+				break;
+			default:
+				break;
+		}
+	}
+	
 	public synchronized void sendPhase1A(int slotIndex){
 		if(decisions.containsKey(slotIndex)){
 			//already decided
@@ -96,7 +206,6 @@ public class Proposer extends GeneralNode{
 			Logger.error("cached phase1A message mismatches with cached c_rnd");
 			return;
 		}
-		//if(!phase1FinishedAtThisMoment(slot))){
 		if(phase1BMsg.getRnd() > c_rnd) {
 			Logger.error("Not possible phase1B rnd value bigger than leader's c_rnd");
 		} else if(phase1BMsg.getRnd() == c_rnd) {
@@ -124,9 +233,8 @@ public class Proposer extends GeneralNode{
 					}
 					sendPhase2A(slot, c_rnd, c_val);
 				}
-			//remove timeout for slot
 		}else {
-			//older accept, outdated
+			//older accept, outdated, ignore
 		}
 	}
 	public synchronized void sendPhase2A(int slotIndex, Long c_rnd, ValueType c_val){
@@ -180,52 +288,50 @@ public class Proposer extends GeneralNode{
 	}
 	
 	private void sendDecision(int slotIndex, ValueType decision) {
-		/*
-		 * TODO
-		 * broadcast the value of each slot to all possible learners (including those who joined later) in an background thread
-		 */
 		PaxosDecisionMessage msg = new PaxosDecisionMessage(this, slotIndex, decision);
 		PaxosMessenger.send(PaxosConfig.getLearnerNetwork(), msg);
 	}
 
-	public static class LeaderOracle {
-		static Proposer leader;
-		static boolean leaderAlive = false;
-		public static boolean isLeaderAlive() {
-			return leaderAlive;
+	/* check whether the set of received messages are from NUM_QUORUM of acceptors */
+	private boolean gotMajority(HashSet<PaxosMessage> received) {
+		HashSet<Integer> acceptorIds = new HashSet<Integer>();
+		for(PaxosMessage msg : received){
+			acceptorIds.add(msg.getFrom().getId());
 		}
-		public static Proposer getLeader(){
-			return leader;
-		}
+		return acceptorIds.size() >= PaxosConfig.NUM_QUORUM;
 	}
-	
+
 	/*
-	 * check timeout for each sent messages (Phase1A, Phase2A), and resend
+	 * Use first 56 bits of nano time + 8 bit of node Id as crnd
+	 * it should be very likely increasing and of low chance to be duplicated
 	 */
-	@Override
-	public void backgroundLoop(){
-		while(true){
-			timeoutManager.check();
-			try {
-				Thread.sleep(PaxosConfig.timeoutCheckInterval);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
+	long lastCRand = 0; //verify incre, for debug only
+	synchronized private long incrementAndGetCRnd(int slot) {
+		long time = System.nanoTime();
+		long res = (time >> 8 << 8) | this.getId();
+		c_rnds.put(slot, res);
+		if(res <= lastCRand)
+			Logger.error("the round number generated is not increasing all the time");
+		lastCRand = res;
+		return res;
 	}
 	
-	@Override
-	public void eventLoop(){
-		while(true){
-			PaxosMessage msg = PaxosMessenger.recv(this.getNetworkGroup());
-			//Boolean existing = events.putIfAbsent(msg, true);
-			//if(existing == null){
-			if(PaxosConfig.extraThreadDispatching)
-				eventArray.add(msg);
-			else
-				dispatchEvent(msg);
-			//}
+	boolean phase1FinishedAtThisMoment(int slot){
+		return phase2ACaches.containsKey(slot) && phase2ACaches.get(slot).getC_rnd() == c_rnds.get(slot);
+	}
+	
+	public class LeaderOracle {
+		Proposer self;
+		LeaderOracle(Proposer self){
+			this.self = self;
+		}
+		
+		Proposer leader;
+		public void runForLeader(Proposer node){
+			
+		}
+		public Proposer getLeader(){
+			return leader;
 		}
 	}
 	
@@ -249,104 +355,5 @@ public class Proposer extends GeneralNode{
 				}
 			}
 		}
-	}
-	
-	
-	public void dispatchEvent(PaxosMessage msg){
-		Proposer leader = LeaderOracle.getLeader();
-		//if(leader == null || leader.getId() != this.getId()){
-		if(false){
-			/*
-			 * do nothing at the moment, rely on the leader will do the real propose to the acceptors
-			 * TODO: send it also to the leader in case the msg failed to reach the leader
-			 */
-		}else {
-			int slot = msg.getSlotIndex();
-			switch (msg.getType()){
-				case MSG_CLIENT:
-					onReceiveClient(msg);
-					break;
-				case MSG_ACCEPTOR_PHASE1B:
-					onReceivePhase1B(msg);
-					break;
-				case MSG_ACCEPTOR_PHASE2B:
-					onReceivePhase2B(msg);
-					break;
-			}
-		}
-	}
-	
-	private boolean gotMajority(HashSet<PaxosMessage> received) {
-		HashSet<Integer> acceptorIds = new HashSet<Integer>();
-		for(PaxosMessage msg : received){
-			acceptorIds.add(msg.getFrom().getId());
-		}
-		return acceptorIds.size() >= PaxosConfig.NUM_QUORUM;
-	}
-
-	long lastCRand = 0; //verify incre
-	synchronized private long incrementAndGetCRnd(int slot) {
-		long time = System.nanoTime();
-		long res = (time >> 8 << 8) | this.getId();
-		
-		c_rnds.put(slot, res);
-		if(res <= lastCRand)
-			Logger.error("the round number generated is not increasing all the time");
-		lastCRand = res;
-		return res;
-	}
-	
-	public static Proposer getById(int id){
-		return getById(id, false);
-	}
-	
-	public static Proposer getById(int id, boolean realInstance){
-		Proposer tmp = new Proposer(id, PaxosConfig.getProposerNetwork(), realInstance);
-		Proposer res = instances.putIfAbsent(id, tmp);
-		if(res == null)
-			return tmp;
-		else
-			return res;
-	}
-	
-	boolean phase1FinishedAtThisMoment(int slot){
-		return phase2ACaches.containsKey(slot) && phase2ACaches.get(slot).getC_rnd() == c_rnds.get(slot);
-	}
-	
-	@Override
-	public NodeType getNodeType() {
-		return NodeType.PROPOSER;
-	}
-	//final Semaphore timeoutLock = new Semaphore(1, true);
-	@Override
-	public synchronized void onTimeout(PaxosMessage record) {
-		//try {
-		//	timeoutLock.acquire();
-		int slot = record.getSlotIndex();
-		switch (record.getType()){
-			case MSG_PROPOSER_PHASE1A:
-				if(!phase1FinishedAtThisMoment(record.getSlotIndex()))
-					sendPhase1A(record.getSlotIndex());
-				break;
-			case MSG_PROPOSER_PHASE2A:
-				if(!decisions.containsKey(slot))
-					sendPhase2A(slot, c_rnds.get(slot), c_vals.get(slot));
-				break;
-			default:
-				break;
-		}
-		//	timeoutLock.release();
-		//} catch (InterruptedException e) {
-		//	// TODO Auto-generated catch block
-		//	e.printStackTrace();
-		//}
-	}
-	@Override
-	public boolean hasNextEvent(){
-		return !eventArray.isEmpty();
-	}
-	@Override
-	public PaxosMessage nextEvent(){
-		return eventArray.poll();
 	}
 }
