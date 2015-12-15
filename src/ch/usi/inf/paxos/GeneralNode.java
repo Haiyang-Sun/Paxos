@@ -7,7 +7,7 @@ import ch.usi.inf.paxos.messages.PaxosMessage;
 import ch.usi.inf.paxos.roles.Proposer;
 
 public abstract class GeneralNode {
-	int id;
+	protected int id;
 	NetworkGroup networkGroup;
 	NodeType nodeType;
 	

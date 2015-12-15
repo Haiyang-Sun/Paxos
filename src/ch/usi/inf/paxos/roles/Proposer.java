@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
@@ -14,8 +15,12 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
+
+import javax.swing.plaf.synth.SynthSpinnerUI;
 
 import ch.usi.inf.logging.Logger;
 import ch.usi.inf.network.NetworkGroup;
@@ -30,7 +35,9 @@ import ch.usi.inf.paxos.messages.acceptor.PaxosPhase1BMessage;
 import ch.usi.inf.paxos.messages.acceptor.PaxosPhase2BMessage;
 import ch.usi.inf.paxos.messages.client.PaxosClientMessage;
 import ch.usi.inf.paxos.messages.leader.PaxosAskForLeaderMessage;
+import ch.usi.inf.paxos.messages.leader.PaxosLeaderHeartBeatMessage;
 import ch.usi.inf.paxos.messages.leader.PaxosNewLeaderMessage;
+import ch.usi.inf.paxos.messages.leader.PaxosProposerHeartBeatMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosDecisionMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosPhase1AMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosPhase2AMessage;
@@ -69,6 +76,11 @@ public class Proposer extends GeneralNode{
 	 * singleton for each slot
 	 */
 	static ConcurrentHashMap<Integer, Proposer> instances = new ConcurrentHashMap<Integer, Proposer>();
+
+	final static AtomicInteger suspectCnt = new AtomicInteger(0);
+	private static AtomicInteger currentLeaderID = new AtomicInteger(0);
+	private static HashSet<Integer> proposerIDPool = new HashSet<Integer>();
+
 	public Proposer(int id, NetworkGroup networkGroup) {
 		super(id, networkGroup);
 	}
@@ -88,6 +100,7 @@ public class Proposer extends GeneralNode{
 	public void backgroundLoop(){
 		//background thread to broadcast decisions all the time
 		new Thread(new DecisionBroadcastThread(this)).start();
+		new Thread(new LeaderTimer(this)).start();
 		if(PaxosConfig.extraThreadDispatching)
 			new Thread(new DispatchThread(this)).start();
 		while(true){
@@ -114,13 +127,21 @@ public class Proposer extends GeneralNode{
 
 	@Override
 	public void dispatchEvent(PaxosMessage msg){
-		if(leaderOracle.getLeader() == null){
-			leaderOracle.runForLeader();
-		}
-		if(!leaderOracle.selfIsLeader()){
+//		if(leaderOracle.getLeader() == null){
+//			leaderOracle.runForLeader();
+//		}
+//		if(!leaderOracle.selfIsLeader()){
 //		if(false){
-			//do nothing, because the leader should work
-			
+			//do nothing but just maintain the heartbeat
+		if(!isLeader()){
+			switch (msg.getType()){
+				case MSG_PROPOSER_LEADER_HEARTBEAT:
+					onReceiveLeaderHeartBeat(msg);
+					break;
+				case MSG_PROPOSER_HEARTBEAT:
+					onReceiveProposerHeartBeat(msg);
+					break;
+			}
 		}else {
 			int slot = msg.getSlotIndex();
 			switch (msg.getType()){
@@ -138,6 +159,12 @@ public class Proposer extends GeneralNode{
 					break;
 				case MSG_ACCEPTOR_CURRENT_LEADER:
 					leaderOracle.onReceiveLeaderInfo((PaxosNewLeaderMessage) msg);
+					break;
+				case MSG_PROPOSER_LEADER_HEARTBEAT:
+					onReceiveLeaderHeartBeat(msg);
+					break;
+				case MSG_PROPOSER_HEARTBEAT:
+					onReceiveProposerHeartBeat(msg);
 					break;
 			}
 		}
@@ -297,10 +324,36 @@ public class Proposer extends GeneralNode{
 			sendDecision(slot, phase2BMsg.getV_val());
 		}
 	}
+
+	private synchronized void onReceiveProposerHeartBeat(PaxosMessage msg) {
+		PaxosProposerHeartBeatMessage proposerHeartBeatMsg = (PaxosProposerHeartBeatMessage)msg;
+		int proposerID = proposerHeartBeatMsg.getFrom().getId();
+		Logger.debug("received proposer Heartbeat:" + proposerID);
+		proposerIDPool.add(proposerID);
+	}
+	private synchronized void onReceiveLeaderHeartBeat(PaxosMessage msg) {
+		PaxosLeaderHeartBeatMessage leaderHeartBeatMsg = (PaxosLeaderHeartBeatMessage)msg;
+		int leaderID = leaderHeartBeatMsg.getFrom().getId();
+		if (leaderID != currentLeaderID.get()) {
+			proposerIDPool.add(leaderID);
+		} else{
+			suspectCnt.set(0);
+		}
+	}
 	
 	private void sendDecision(int slotIndex, ValueType decision) {
 		PaxosDecisionMessage msg = new PaxosDecisionMessage(this, slotIndex, decision);
 		PaxosMessenger.send(PaxosConfig.getLearnerNetwork(), msg);
+	}
+	
+	private void sendLeaderHB(){
+		PaxosLeaderHeartBeatMessage msg = new PaxosLeaderHeartBeatMessage(this);
+		PaxosMessenger.send(PaxosConfig.getProposerNetwork(), msg);
+	}
+
+	private void sendProposerHB(){
+		PaxosProposerHeartBeatMessage msg = new PaxosProposerHeartBeatMessage(this);
+		PaxosMessenger.send(PaxosConfig.getProposerNetwork(), msg);
 	}
 
 	/* check whether the set of received messages are from NUM_QUORUM of acceptors */
@@ -351,5 +404,59 @@ public class Proposer extends GeneralNode{
 				}
 			}
 		}
+	}
+
+	//used for keeping heartbeat among leaders and proposers
+	static class LeaderTimer implements Runnable{
+		Proposer proposer;
+		public LeaderTimer(Proposer proposer) {
+			super();
+			this.proposer = proposer;
+		}
+		@Override
+		public void run() {
+			while(true){
+				proposerIDPool.add(proposer.getId());
+
+				//if there is a propser with lower id, make it the leader
+				if (proposer.isLeader() == true &&
+						Collections.min(proposerIDPool) < proposer.id){
+					Logger.debug("Current Leader " + proposer.getId() + " found a propser with smaller id. Changing Leader.");
+					proposer.changeLeader();
+				}
+
+				//if the current leader loses its heartbeat, change the leader
+				if (proposer.isLeader() == false &&
+						suspectCnt.getAndIncrement() > PaxosConfig.susptIntervalCnt){
+					Logger.debug("Lose leader heartbeat. Changing leader.");
+					proposer.changeLeader();
+				}
+				
+				if (proposer.isLeader()){
+					proposer.sendLeaderHB();
+				}
+				
+				proposer.sendProposerHB();
+
+				try {
+					Thread.sleep(PaxosConfig.proposerInterval);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+
+	private boolean isLeader(){
+		return currentLeaderID.get() == id;
+	}
+
+	synchronized private void changeLeader(){
+		int id = currentLeaderID.get();
+		proposerIDPool.remove(id);
+		int newLeader = Collections.min(proposerIDPool);
+		currentLeaderID.set(newLeader);
+		Logger.debug("Leader has been set to " + newLeader);
 	}
 }

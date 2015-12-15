@@ -10,7 +10,8 @@ import ch.usi.inf.network.NetworkGroup;
 import ch.usi.inf.paxos.roles.Proposer;
 
 public class PaxosConfig {
-	public static boolean debug = false;
+	public static boolean debug = true;
+	public static boolean msgDebug = false;
 	public static final int NUM_ACCEPTORS = 3; 
 	public static final int NUM_QUORUM = 2; 
 	
@@ -27,6 +28,10 @@ public class PaxosConfig {
 	public static long clientBroadCastTime = 5000;
 	public static long fetchEventInterval = 1000; //wait time when the event list is empty
 	public static long timeoutCheckInterval = timeoutMilisecs / 2;
+	public static long leaderHBInterval = 1000;
+	public static long proposerInterval = leaderHBInterval;
+	public static long susptIntervalCnt = 3;
+
 	public static boolean initFromFile(String path){
 		try {
 			File file = new File(path);
