@@ -15,6 +15,7 @@ import ch.usi.inf.paxos.messages.acceptor.PaxosPhase1BMessage;
 import ch.usi.inf.paxos.messages.acceptor.PaxosPhase2BMessage;
 import ch.usi.inf.paxos.messages.client.PaxosClientMessage;
 import ch.usi.inf.paxos.messages.leader.PaxosAskForLeaderMessage;
+import ch.usi.inf.paxos.messages.leader.PaxosClientSuccessMessage;
 import ch.usi.inf.paxos.messages.leader.PaxosLeaderHeartBeatMessage;
 import ch.usi.inf.paxos.messages.leader.PaxosNewLeaderMessage;
 import ch.usi.inf.paxos.messages.leader.PaxosProposerHeartBeatMessage;
@@ -30,7 +31,7 @@ public class PaxosMessenger {
 	
 	public static int MAX_PACKET_LENGTH = 1000;
 	
-	public enum MessageType{MSG_CLIENT, MSG_PROPOSER_PHASE1A, MSG_PROPOSER_PHASE2A,MSG_ACCEPTOR_PHASE1B,MSG_ACCEPTOR_PHASE2B, MSG_PROPOSER_DECIDE, MSG_ACCEPTOR_ASK_FOR_LEADER, MSG_ACCEPTOR_CURRENT_LEADER, MSG_PROPOSER_RUN_FOR_LEADER, MSG_UNKONWN, MSG_PROPOSER_LEADER_HEARTBEAT, MSG_PROPOSER_HEARTBEAT};
+	public enum MessageType{MSG_CLIENT, MSG_PROPOSER_PHASE1A, MSG_PROPOSER_PHASE2A,MSG_ACCEPTOR_PHASE1B,MSG_ACCEPTOR_PHASE2B, MSG_PROPOSER_DECIDE, MSG_ACCEPTOR_ASK_FOR_LEADER, MSG_ACCEPTOR_CURRENT_LEADER, MSG_PROPOSER_RUN_FOR_LEADER, MSG_UNKONWN, MSG_PROPOSER_LEADER_HEARTBEAT, MSG_PROPOSER_HEARTBEAT, MSG_CLIENT_SUCCESS};
 	
 	public static byte msgType2Byte(MessageType type){
 		switch(type){
@@ -56,6 +57,8 @@ public class PaxosMessenger {
 				return 9;
 			case MSG_PROPOSER_HEARTBEAT:
 				return 10;
+			case MSG_CLIENT_SUCCESS:
+				return 11;
 		}
 		return -1;
 	}
@@ -84,6 +87,8 @@ public class PaxosMessenger {
 				return MessageType.MSG_PROPOSER_LEADER_HEARTBEAT;
 			case 10:
 				return MessageType.MSG_PROPOSER_HEARTBEAT;
+			case 11:
+				return MessageType.MSG_CLIENT_SUCCESS;
 		}
 		return MessageType.MSG_UNKONWN;
 	}
@@ -194,6 +199,10 @@ public class PaxosMessenger {
 				break;
 			case MSG_PROPOSER_HEARTBEAT:
 				res = new PaxosProposerHeartBeatMessage(Proposer.getById(nodeId));
+				break;
+			case MSG_CLIENT_SUCCESS:
+				i1 = buf.getInt();
+				res = new PaxosClientSuccessMessage(Client.getById(nodeId), i1);
 				break;
 			case MSG_UNKONWN:
 				Logger.error("Unknown message is received");
