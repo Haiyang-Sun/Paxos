@@ -13,6 +13,7 @@ public class PaxosPhase2AMessage extends PaxosMessage {
 	private Proposer proposer;
 	private long c_rnd;
 	private ValueType c_val;
+	private boolean escapePhase1;
 	
 	public ValueType getC_val() {
 		return c_val;
@@ -22,18 +23,20 @@ public class PaxosPhase2AMessage extends PaxosMessage {
 		return c_rnd;
 	}
 
-	public PaxosPhase2AMessage(Proposer proposer, int slotIndex, long c_rnd, ValueType c_val) {
+	public PaxosPhase2AMessage(Proposer proposer, int slotIndex, long c_rnd, ValueType c_val, boolean escapePhase1) {
 		super(proposer, slotIndex);
 		this.proposer = proposer;
 		this.c_rnd = c_rnd;
 		this.c_val = c_val;
+		this.escapePhase1 = escapePhase1;
 	}
 	
-	public PaxosPhase2AMessage(Proposer proposer, int slotIndex, long c_rnd, ValueType c_val, int msgId) {
+	public PaxosPhase2AMessage(Proposer proposer, int slotIndex, long c_rnd, ValueType c_val, int msgId, boolean escapePhase1) {
 		super(proposer, slotIndex, msgId);
 		this.proposer = proposer;
 		this.c_rnd = c_rnd;
 		this.c_val = c_val;
+		this.escapePhase1 = escapePhase1;
 	}
 
 	@Override
@@ -44,6 +47,7 @@ public class PaxosPhase2AMessage extends PaxosMessage {
 		bytes.putInt(slotIndex);
 		bytes.putInt(msgId);
 		bytes.putLong(c_rnd);
+		bytes.putInt(escapePhase1?1:0);
 		bytes.put(c_val.getValue());
 		return bytes;
 	}
@@ -51,6 +55,10 @@ public class PaxosPhase2AMessage extends PaxosMessage {
 	@Override
 	public MessageType getType(){
 		return MessageType.MSG_PROPOSER_PHASE2A;
+	}
+	
+	public boolean getEscapePhase1(){
+		return this.escapePhase1;
 	}
 
 }

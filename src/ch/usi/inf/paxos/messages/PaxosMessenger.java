@@ -121,7 +121,7 @@ public class PaxosMessenger {
 	}
 	
 	public static void send(NetworkGroup target, PaxosMessage msg){
-		randomSleep(PaxosConfig.randomSleep);
+		//randomSleep(PaxosConfig.randomSleep);
 		Logger.msgDebug("Send message "+msg.toString()+" to "+target);
 		getMulticast(target).send(msg.getMessageBytes());
 	}
@@ -176,17 +176,19 @@ public class PaxosMessenger {
 				break;
 			case MSG_PROPOSER_PHASE2A:
 				v1 = buf.getLong();
+				boolean esacpeFlag2A = buf.getInt() == 1?true:false;
 				position = buf.position();
 				valueBuf = new byte[size - position];
 				buf.get(valueBuf, 0, size - position);
-				res = new PaxosPhase2AMessage(Proposer.getById(nodeId), slotIndex, v1, new ValueType(valueBuf), msgId);
+				res = new PaxosPhase2AMessage(Proposer.getById(nodeId), slotIndex, v1, new ValueType(valueBuf), msgId, esacpeFlag2A);
 				break;
 			case MSG_ACCEPTOR_PHASE2B:
 				v1 = buf.getLong();
+				boolean esacpeFlag2B = buf.getInt() == 1?true:false;
 				position = buf.position();
 				valueBuf = new byte[size - position];
 				buf.get(valueBuf, 0, size - position);
-				res = new PaxosPhase2BMessage(Acceptor.getById(nodeId), slotIndex, v1, new ValueType(valueBuf), msgId);
+				res = new PaxosPhase2BMessage(Acceptor.getById(nodeId), slotIndex, v1, new ValueType(valueBuf), msgId, esacpeFlag2B);
 				break;
 			case MSG_PROPOSER_DECIDE:
 				position = buf.position();

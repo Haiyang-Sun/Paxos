@@ -75,6 +75,7 @@ public class Proposer extends GeneralNode{
 	ConcurrentHashMap<Integer, Integer> clientAcceptedSlot = new ConcurrentHashMap<Integer, Integer>();
 	
 	private static AtomicBoolean idle = new AtomicBoolean(true);
+	private static AtomicBoolean escapePhase1 = new AtomicBoolean(false);
 
 	private static AtomicLong c_rnd_prefix = new AtomicLong(0);
 	private static AtomicLong c_rnd = new AtomicLong(0);
@@ -328,7 +329,8 @@ public class Proposer extends GeneralNode{
 			//already decided
 			return;
 		}
-		PaxosPhase2AMessage msg = new PaxosPhase2AMessage(this, slotIndex, c_rnd, c_val);
+		boolean escapeFlag = PaxosConfig.escapePhase1 & escapePhase1.get();
+		PaxosPhase2AMessage msg = new PaxosPhase2AMessage(this, slotIndex, c_rnd, c_val, escapeFlag);
 		phase2ACaches.put(slotIndex, msg);
 		phase2AResponses.remove(slotIndex);
 		timeoutManager.add(msg);
@@ -358,8 +360,12 @@ public class Proposer extends GeneralNode{
 		}
 
 		Long c_rnd = this.c_rnd.get();
+		if (phase2BMsg.getEscapePhase1() == false){
+			escapePhase1.set(false);
+		}
 
 		PaxosPhase2AMessage phase2AMsg = phase2ACaches.get(slot);
+
 //		if(phase2AMsg.getC_rnd() != c_rnd){
 //			Logger.error("cached phase2A message mismatches with cached c_rnd");
 //			return;
@@ -391,6 +397,9 @@ public class Proposer extends GeneralNode{
 			}
 			sendDecision(slot, phase2BMsg.getV_val());
 			sendPush(slot, phase2BMsg.getV_val());
+			if (PaxosConfig.escapePhase1){
+				this.escapePhase1.set(true);
+			}
 			Logger.debug("move to slot: " + proposerCurSlot.get());
 		}
 	}
@@ -515,10 +524,20 @@ public class Proposer extends GeneralNode{
 			while (true){
 				if (proposer.isIdle() && !proposer.listIsEmpty()){
 					proposer.setIdle(false);
-					proposer.sendPhase1A();
+					proposer.startNewRound();
 				}
 			}
 			
+		}
+	}
+	
+	public void startNewRound(){
+		if (PaxosConfig.escapePhase1 & this.escapePhase1.get()){
+				c_val = clientAcceptedList.get(proposerCurSlot.get());
+				Logger.debug("Escape phase 1A");
+				sendPhase2A(proposerCurSlot.get(), c_rnd.get(), c_val);
+		} else {
+			sendPhase1A();
 		}
 	}
 	

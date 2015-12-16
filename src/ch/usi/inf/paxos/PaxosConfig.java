@@ -10,7 +10,7 @@ import ch.usi.inf.network.NetworkGroup;
 import ch.usi.inf.paxos.roles.Proposer;
 
 public class PaxosConfig {
-	public static boolean debug = true;
+	public static boolean debug = false;
 	public static boolean msgDebug = false;
 	public static boolean msgHeartBeat = false;
 	public static final int NUM_ACCEPTORS = 3; 

@@ -14,6 +14,7 @@ public class PaxosPhase2BMessage extends PaxosMessage {
 	Acceptor acceptor;
 	long v_rnd;
 	ValueType v_val;
+	private boolean escapePhase1;
 
 	public long getV_rnd() {
 		return v_rnd;
@@ -23,18 +24,20 @@ public class PaxosPhase2BMessage extends PaxosMessage {
 		return v_val;
 	}
 	
-	public PaxosPhase2BMessage(Acceptor acceptor, int slotIndex, long v_rnd, ValueType v_val) {
+	public PaxosPhase2BMessage(Acceptor acceptor, int slotIndex, long v_rnd, ValueType v_val, boolean escapePhase1) {
 		super(acceptor, slotIndex);
 		this.acceptor = acceptor;
 		this.v_rnd = v_rnd;
 		this.v_val = v_val;
+		this.escapePhase1 = escapePhase1;
 	}
 	
-	public PaxosPhase2BMessage(Acceptor acceptor, int slotIndex, long v_rnd, ValueType v_val, int msgId) {
+	public PaxosPhase2BMessage(Acceptor acceptor, int slotIndex, long v_rnd, ValueType v_val, int msgId, boolean escapePhase1) {
 		super(acceptor, slotIndex, msgId);
 		this.acceptor = acceptor;
 		this.v_rnd = v_rnd;
 		this.v_val = v_val;
+		this.escapePhase1 = escapePhase1;
 	}
 
 	@Override
@@ -45,6 +48,7 @@ public class PaxosPhase2BMessage extends PaxosMessage {
 		bytes.putInt(slotIndex);
 		bytes.putInt(msgId);
 		bytes.putLong(v_rnd);
+		bytes.putInt(escapePhase1?1:0);
 		bytes.put(v_val.getValue());
 		return bytes;
 	}
@@ -52,6 +56,10 @@ public class PaxosPhase2BMessage extends PaxosMessage {
 	@Override
 	public MessageType getType(){
 		return MessageType.MSG_ACCEPTOR_PHASE2B;
+	}
+	
+	public boolean getEscapePhase1(){
+		return this.escapePhase1;
 	}
 
 }

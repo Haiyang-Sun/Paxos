@@ -5,8 +5,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.omg.PortableServer.POA;
 
 import ch.usi.inf.logging.Logger;
 import ch.usi.inf.network.NetworkGroup;
@@ -36,6 +39,9 @@ public class Acceptor extends GeneralNode{
 	private long rnd = 0; 
 	private long v_rnd = 0;
 	private ValueType v_val = ValueType.NIL;
+	
+	private AtomicBoolean escapeCheck = new AtomicBoolean(false);
+	private AtomicInteger lastProposalId = new AtomicInteger(0);
 	
 	public Acceptor(int id, NetworkGroup networkGroup) {
 		super(id, networkGroup);
@@ -94,6 +100,7 @@ public class Acceptor extends GeneralNode{
 	public synchronized void onReceivePhase2A(PaxosMessage msg){
 		PaxosPhase2AMessage phase2AMsg = (PaxosPhase2AMessage) msg;
 		int slot = msg.getSlotIndex();
+		boolean escape1AFlag = PaxosConfig.escapePhase1 & phase2AMsg.getEscapePhase1();
 		//not current slot, ignore
 		if (slot != maxSlot.get()){
 			return;
@@ -109,15 +116,24 @@ public class Acceptor extends GeneralNode{
 //			v_vals.put(slot, phase2AMsg.getC_val());
 			v_rnd = phase2AMsg.getC_rnd();
 			v_val = phase2AMsg.getC_val();
-			sendPhase2B(slot, v_rnd, v_val);
+			sendPhase2B(slot, v_rnd, v_val, escape1AFlag);
 		} else {
 			//TODO: add reject message
-			sendPhase2B(slot, v_rnd, v_val);
+			sendPhase2B(slot, v_rnd, v_val, false);
 		}
 	}
-	public synchronized void sendPhase2B(int slotIndex, Long v_rnd, ValueType v_val){
-		PaxosPhase2BMessage msg = new PaxosPhase2BMessage(this, slotIndex, v_rnd, v_val);
+	public synchronized void sendPhase2B(int slotIndex, Long v_rnd, ValueType v_val, boolean flag){
+		PaxosPhase2BMessage msg = new PaxosPhase2BMessage(this, slotIndex, v_rnd, v_val, flag & escapeCheck.get());
 		PaxosMessenger.send(PaxosConfig.getProposerNetwork(), msg);
+	}
+	
+	public void checkEscape(int proposerId){
+		if (lastProposalId.get() == proposerId){
+			escapeCheck.set(true);
+		} else {
+			escapeCheck.set(false);
+		}
+		lastProposalId.set(proposerId);
 	}
 	
 	@Override
