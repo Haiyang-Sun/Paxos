@@ -143,7 +143,7 @@ public class Proposer extends GeneralNode{
 		//do nothing but just maintain the heartbeat
 		if(!isLeader()){
 			switch (msg.getType()){
-			case MSG_PROPOSER_DECIDE:
+				case MSG_PROPOSER_DECIDE:
 					onReceiveDecide(msg);
 					break;
 				case MSG_PROPOSER_LEADER_HEARTBEAT:
@@ -244,6 +244,7 @@ public class Proposer extends GeneralNode{
 		}
 		//has been previously processed, skip
 		if (clientAcceptedSlot.get(clientId) >= clientSlot){
+			sendClientSuccess(clientId, clientSlot);
 			return;
 		}
 
@@ -333,7 +334,7 @@ public class Proposer extends GeneralNode{
 			return;
 		}
 		boolean escapeFlag = PaxosConfig.escapePhase1 & escapePhase1.get();
-		Logger.debug("sending quick2A for slot" + slotIndex + "with flag " +escapeFlag);
+		Logger.debug("sending quick 2A for slot" + slotIndex + "with flag " +escapeFlag);
 		PaxosPhase2AMessage msg = new PaxosPhase2AMessage(this, slotIndex, c_rnd, c_val, escapeFlag);
 		phase2ACaches.put(slotIndex, msg);
 		phase2AResponses.remove(slotIndex);
