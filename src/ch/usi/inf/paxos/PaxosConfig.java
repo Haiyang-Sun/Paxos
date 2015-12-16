@@ -22,7 +22,10 @@ public class PaxosConfig {
 	static NetworkGroup learnerNetwork;
 	public enum NetworkLevel {NORMAL};
 	static NetworkLevel networkLevel = NetworkLevel.NORMAL;
+
 	public static boolean extraThreadDispatching = true;
+	public static boolean escapePhase1 = false;
+
 	public static long decisionBroadcastIntervalMilisecs = 200;
 	public static long timeoutMilisecs = 100;
 	public static int randomSleep = 100;

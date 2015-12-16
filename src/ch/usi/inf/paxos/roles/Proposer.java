@@ -142,6 +142,9 @@ public class Proposer extends GeneralNode{
 		//do nothing but just maintain the heartbeat
 		if(!isLeader()){
 			switch (msg.getType()){
+			case MSG_PROPOSER_DECIDE:
+					onReceiveDecide(msg);
+					break;
 				case MSG_PROPOSER_LEADER_HEARTBEAT:
 					onReceiveLeaderHeartBeat(msg);
 					break;
@@ -386,6 +389,7 @@ public class Proposer extends GeneralNode{
 				proposerCurSlot.incrementAndGet();
 				idle.set(true);
 			}
+			sendDecision(slot, phase2BMsg.getV_val());
 			sendPush(slot, phase2BMsg.getV_val());
 			Logger.debug("move to slot: " + proposerCurSlot.get());
 		}
@@ -396,6 +400,14 @@ public class Proposer extends GeneralNode{
 		int slot = learnMsg.getRequireSlot();
 		if (proposerCurSlot.get() >= slot){
 			sendPush(slot, clientAcceptedList.get(slot));
+		}
+	}
+
+	private synchronized void onReceiveDecide(PaxosMessage msg) {
+		PaxosDecisionMessage decMsg = (PaxosDecisionMessage)msg;
+		if (!isLeader()){
+			decisions.put(decMsg.getSlotIndex(), decMsg.getDecision());
+			proposerCurSlot.set(decMsg.getSlotIndex());
 		}
 	}
 				
@@ -424,7 +436,7 @@ public class Proposer extends GeneralNode{
 	
 	private void sendDecision(int slotIndex, ValueType decision) {
 		PaxosDecisionMessage msg = new PaxosDecisionMessage(this, slotIndex, decision);
-		PaxosMessenger.send(PaxosConfig.getLearnerNetwork(), msg);
+		PaxosMessenger.send(PaxosConfig.getProposerNetwork(), msg);
 	}
 
 	private void sendPush(int slotIndex, ValueType decision) {
