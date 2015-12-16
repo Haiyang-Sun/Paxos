@@ -27,11 +27,12 @@ public class PaxosConfig {
 	public static long timeoutMilisecs = 100;
 	public static int randomSleep = 100;
 	public static long clientBroadCastTime = 10;
-	public static long fetchEventInterval = 1000; //wait time when the event list is empty
+	public static long fetchEventInterval = 10; //wait time when the event list is empty
 	public static long timeoutCheckInterval = timeoutMilisecs / 2;
 	public static long leaderHBInterval = 1000;
 	public static long proposerInterval = leaderHBInterval;
 	public static long susptIntervalCnt = 3;
+	public static long learnerFetchInterval = 1000;
 
 	public static boolean initFromFile(String path){
 		try {

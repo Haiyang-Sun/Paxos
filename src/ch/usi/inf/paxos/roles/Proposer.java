@@ -1,35 +1,23 @@
 package ch.usi.inf.paxos.roles;
 
-import java.io.IOException;
-import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-
-import javax.swing.plaf.synth.SynthSpinnerUI;
 
 import ch.usi.inf.logging.Logger;
 import ch.usi.inf.network.NetworkGroup;
 import ch.usi.inf.paxos.GeneralNode;
 import ch.usi.inf.paxos.PaxosConfig;
 import ch.usi.inf.paxos.ValueType;
-import ch.usi.inf.paxos.GeneralNode.NodeType;
+import ch.usi.inf.paxos.message.learner.PaxosLearnMessage;
 import ch.usi.inf.paxos.messages.MessageTimeoutManager;
 import ch.usi.inf.paxos.messages.PaxosMessage;
 import ch.usi.inf.paxos.messages.PaxosMessenger;
@@ -41,6 +29,7 @@ import ch.usi.inf.paxos.messages.leader.PaxosClientSuccessMessage;
 import ch.usi.inf.paxos.messages.leader.PaxosLeaderHeartBeatMessage;
 import ch.usi.inf.paxos.messages.leader.PaxosNewLeaderMessage;
 import ch.usi.inf.paxos.messages.leader.PaxosProposerHeartBeatMessage;
+import ch.usi.inf.paxos.messages.leader.PaxosPushMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosDecisionMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosPhase1AMessage;
 import ch.usi.inf.paxos.messages.proposer.PaxosPhase2AMessage;
@@ -115,7 +104,7 @@ public class Proposer extends GeneralNode{
 	@Override
 	public void backgroundLoop(){
 		//background thread to broadcast decisions all the time
-		new Thread(new DecisionBroadcastThread(this)).start();
+		//new Thread(new DecisionBroadcastThread(this)).start();
 		new Thread(new LeaderTimer(this)).start();
 		new Thread(new Phase1AThread(this)).start();
 		if(PaxosConfig.extraThreadDispatching)
@@ -171,6 +160,9 @@ public class Proposer extends GeneralNode{
 					break;
 				case MSG_ACCEPTOR_PHASE2B:
 					onReceivePhase2B(msg);
+					break;
+				case MSG_LEARNER_LEARN:
+					onReceiveLearn(msg);
 					break;
 				case MSG_ACCEPTOR_ASK_FOR_LEADER:
 					leaderOracle.onAskForLeader((PaxosAskForLeaderMessage) msg);
@@ -394,10 +386,19 @@ public class Proposer extends GeneralNode{
 				proposerCurSlot.incrementAndGet();
 				idle.set(true);
 			}
-			sendDecision(slot, phase2BMsg.getV_val());
+			sendPush(slot, phase2BMsg.getV_val());
 			Logger.debug("move to slot: " + proposerCurSlot.get());
 		}
 	}
+
+	private synchronized void onReceiveLearn(PaxosMessage msg) {
+		PaxosLearnMessage learnMsg = (PaxosLearnMessage)msg;
+		int slot = learnMsg.getRequireSlot();
+		if (proposerCurSlot.get() >= slot){
+			sendPush(slot, clientAcceptedList.get(slot));
+		}
+	}
+				
 
 	private synchronized void onReceiveProposerHeartBeat(PaxosMessage msg) {
 		PaxosProposerHeartBeatMessage proposerHeartBeatMsg = (PaxosProposerHeartBeatMessage)msg;
@@ -423,6 +424,11 @@ public class Proposer extends GeneralNode{
 	
 	private void sendDecision(int slotIndex, ValueType decision) {
 		PaxosDecisionMessage msg = new PaxosDecisionMessage(this, slotIndex, decision);
+		PaxosMessenger.send(PaxosConfig.getLearnerNetwork(), msg);
+	}
+
+	private void sendPush(int slotIndex, ValueType decision) {
+		PaxosPushMessage msg = new PaxosPushMessage(this, slotIndex, decision);
 		PaxosMessenger.send(PaxosConfig.getLearnerNetwork(), msg);
 	}
 	
