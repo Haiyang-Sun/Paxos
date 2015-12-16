@@ -25,6 +25,10 @@ public class Logger {
     }
 
     public static void write(final LoggerType type, final String log){
+    	String prefix = "";
+    	if (PaxosConfig.logClock){
+    		prefix = '[' + Long.toString(System.currentTimeMillis()) + ']';
+    	}
         switch(type){
         case DEBUG:
         	if(PaxosConfig.debug)
@@ -39,7 +43,7 @@ public class Logger {
         		System.out.println("MSG_SUBMIT: "+log);
             break;
         case INFO:
-        	System.out.println(log);
+        	System.out.println(prefix + log);
             break;
         case HEARTBEAT:
         	if(PaxosConfig.msgHeartBeat)

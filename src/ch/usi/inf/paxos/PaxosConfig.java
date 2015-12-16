@@ -14,9 +14,13 @@ public class PaxosConfig {
 	public static boolean msgDebug = false;
 	public static boolean msgHeartBeat = false;
 	public static boolean submitDebug = false;
+	public static boolean logClock = true;
 
 	public static final int NUM_ACCEPTORS = 3; 
 	public static final int NUM_QUORUM = 2; 
+
+	public static boolean extraThreadDispatching = true;
+	public static boolean escapePhase1 = false;
 	
 	static NetworkGroup clientNetwork;
 	static NetworkGroup proposerNetwork;
@@ -25,11 +29,8 @@ public class PaxosConfig {
 	public enum NetworkLevel {NORMAL};
 	static NetworkLevel networkLevel = NetworkLevel.NORMAL;
 
-	public static boolean extraThreadDispatching = true;
-	public static boolean escapePhase1 = true;
-
 	public static long decisionBroadcastIntervalMilisecs = 200;
-	public static long timeoutMilisecs = 100;
+	public static long timeoutMilisecs = 10;
 	public static int randomSleep = 100;
 	public static long clientBroadCastTime = 10;
 	public static long fetchEventInterval = 10; //wait time when the event list is empty
