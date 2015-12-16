@@ -248,7 +248,7 @@ public class Proposer extends GeneralNode{
 		}
 
 		clientAcceptedSlot.put(clientId, clientSlot);
-		Logger.debug("Received slot " + clientSlot + " from client " + clientId);
+		Logger.submitDebug("Received slot " + clientSlot + " from client " + clientId);
 		ValueType value = clientMsg.getValue();
 		clientAcceptedList.add(value);
 		sendClientSuccess(clientId, clientSlot);
@@ -330,12 +330,14 @@ public class Proposer extends GeneralNode{
 			return;
 		}
 		boolean escapeFlag = PaxosConfig.escapePhase1 & escapePhase1.get();
+		Logger.debug("sending quick2A for slot" + slotIndex + "with flag " +escapeFlag);
 		PaxosPhase2AMessage msg = new PaxosPhase2AMessage(this, slotIndex, c_rnd, c_val, escapeFlag);
 		phase2ACaches.put(slotIndex, msg);
 		phase2AResponses.remove(slotIndex);
 		timeoutManager.add(msg);
 		PaxosMessenger.send(PaxosConfig.getAcceptorNetwork(), msg);
 	}
+
 	public synchronized void onReceivePhase2B(PaxosMessage msg){
 		if (idle.get() == true)
 			return;
@@ -359,21 +361,34 @@ public class Proposer extends GeneralNode{
 			return;
 		}
 
+		PaxosPhase2AMessage phase2AMsg = phase2ACaches.get(slot);
+
 		Long c_rnd = this.c_rnd.get();
-		if (phase2BMsg.getEscapePhase1() == false){
+
+		//start over
+		Logger.debug("Processing 2B with flag " + phase2BMsg.getEscapePhase1() + " and local flag " + escapePhase1.get());
+		if (PaxosConfig.escapePhase1 && !phase2BMsg.getEscapePhase1() && escapePhase1.get()){
+			Logger.debug("Received rejcet escapeP1 from acceptor. Start over.");
 			escapePhase1.set(false);
+			idle.set(true);
+			timeoutManager.remove(phase2AMsg);
 		}
 
-		PaxosPhase2AMessage phase2AMsg = phase2ACaches.get(slot);
 
 //		if(phase2AMsg.getC_rnd() != c_rnd){
 //			Logger.error("cached phase2A message mismatches with cached c_rnd");
 //			return;
 //		}
-		if(phase2BMsg.getV_rnd() < c_rnd){
+		
+		boolean goahead = PaxosConfig.escapePhase1 && phase2BMsg.getEscapePhase1() && escapePhase1.get();
+		if (goahead) {
+			Logger.debug("received a 2BMsg without phase1. Proceed.");
+		}
+		
+		if(phase2BMsg.getV_rnd() < c_rnd && !goahead){
 			//old message, omit
 			return;
-		}else if(phase2BMsg.getV_rnd() > c_rnd){
+		}else if(phase2BMsg.getV_rnd() > c_rnd && !goahead){
 			Logger.debug("ger reject from accpetors. Start over.");
 			increaseAndResendPhase1A();
 			return;
@@ -392,15 +407,17 @@ public class Proposer extends GeneralNode{
 			if(!decisions.containsKey(slot)){
 				decisions.put(slot, phase2BMsg.getV_val());
 				Logger.info("Decision for slot "+slot+" "+ new String(phase2BMsg.getV_val().getValue(), StandardCharsets.UTF_8));
-				proposerCurSlot.incrementAndGet();
-				idle.set(true);
 			}
+
 			sendDecision(slot, phase2BMsg.getV_val());
 			sendPush(slot, phase2BMsg.getV_val());
+
 			if (PaxosConfig.escapePhase1){
 				this.escapePhase1.set(true);
 			}
+			proposerCurSlot.incrementAndGet();
 			Logger.debug("move to slot: " + proposerCurSlot.get());
+			idle.set(true);
 		}
 	}
 
@@ -532,7 +549,7 @@ public class Proposer extends GeneralNode{
 	}
 	
 	public void startNewRound(){
-		if (PaxosConfig.escapePhase1 & this.escapePhase1.get()){
+		if (PaxosConfig.escapePhase1 && escapePhase1.get()){
 				c_val = clientAcceptedList.get(proposerCurSlot.get());
 				Logger.debug("Escape phase 1A");
 				sendPhase2A(proposerCurSlot.get(), c_rnd.get(), c_val);

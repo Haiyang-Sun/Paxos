@@ -10,9 +10,11 @@ import ch.usi.inf.network.NetworkGroup;
 import ch.usi.inf.paxos.roles.Proposer;
 
 public class PaxosConfig {
-	public static boolean debug = false;
+	public static boolean debug = true;
 	public static boolean msgDebug = false;
 	public static boolean msgHeartBeat = false;
+	public static boolean submitDebug = false;
+
 	public static final int NUM_ACCEPTORS = 3; 
 	public static final int NUM_QUORUM = 2; 
 	
@@ -24,7 +26,7 @@ public class PaxosConfig {
 	static NetworkLevel networkLevel = NetworkLevel.NORMAL;
 
 	public static boolean extraThreadDispatching = true;
-	public static boolean escapePhase1 = false;
+	public static boolean escapePhase1 = true;
 
 	public static long decisionBroadcastIntervalMilisecs = 200;
 	public static long timeoutMilisecs = 100;

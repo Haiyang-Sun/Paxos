@@ -70,6 +70,7 @@ public class Acceptor extends GeneralNode{
 				" with c_rnd " + phase1AMsg.getC_rnd());
 		//current slot
 		if (slot == maxSlot.get()){
+			checkEscape1A(phase1AMsg.getFrom().getId());
 			if(phase1AMsg.getC_rnd() > rnd){
 				rnd = phase1AMsg.getC_rnd(); 
 				v_rnd = 0;
@@ -101,22 +102,35 @@ public class Acceptor extends GeneralNode{
 		PaxosPhase2AMessage phase2AMsg = (PaxosPhase2AMessage) msg;
 		int slot = msg.getSlotIndex();
 		boolean escape1AFlag = PaxosConfig.escapePhase1 & phase2AMsg.getEscapePhase1();
+
+		checkEscape2A(phase2AMsg.getFrom().getId(), phase2AMsg.getEscapePhase1());
 		//not current slot, ignore
 		if (slot != maxSlot.get()){
-			return;
+			if (!(escape1AFlag))
+				return;
+			else{
+				maxSlot.set(slot);
+			}
 		}
 
 		//in case an acceptor is started half-way
 		//rnds.putIfAbsent(slot, 0L);
 		//v_rnds.putIfAbsent(slot, 0L);
 		//v_vals.putIfAbsent(slot, ValueType.NIL);
+		if (escape1AFlag){
+			Logger.debug("Receive a 2AMsg without 1A, proceed");
+			v_rnd = phase2AMsg.getC_rnd();
+			v_val = phase2AMsg.getC_val();
+			sendPhase2B(slot, v_rnd, v_val, this.escapeCheck.get());
+			return;
+		}
 		
 		if(phase2AMsg.getC_rnd() >= rnd){
 //			v_rnds.put(slot, phase2AMsg.getC_rnd());
 //			v_vals.put(slot, phase2AMsg.getC_val());
 			v_rnd = phase2AMsg.getC_rnd();
 			v_val = phase2AMsg.getC_val();
-			sendPhase2B(slot, v_rnd, v_val, escape1AFlag);
+			sendPhase2B(slot, v_rnd, v_val, escape1AFlag & this.escapeCheck.get());
 		} else {
 			//TODO: add reject message
 			sendPhase2B(slot, v_rnd, v_val, false);
@@ -127,8 +141,17 @@ public class Acceptor extends GeneralNode{
 		PaxosMessenger.send(PaxosConfig.getProposerNetwork(), msg);
 	}
 	
-	public void checkEscape(int proposerId){
+	public void checkEscape1A(int proposerId){
 		if (lastProposalId.get() == proposerId){
+			//remain it
+		} else {
+			escapeCheck.set(false);
+			lastProposalId.set(0);
+		}
+	}
+
+	public void checkEscape2A(int proposerId, boolean flag){
+		if (flag && lastProposalId.get() == proposerId){
 			escapeCheck.set(true);
 		} else {
 			escapeCheck.set(false);

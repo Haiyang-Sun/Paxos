@@ -98,7 +98,7 @@ public class Client extends GeneralNode{
 
 		int slotIndex = successMsg.getSlotIndex();
 		if (slotIndex == offset) {
-			Logger.debug("received comfirm of local slot: " + slotIndex);
+			Logger.submitDebug("received comfirm of local slot: " + slotIndex);
 			offset++;
 		}
 	}
