@@ -134,6 +134,7 @@ public class Proposer extends GeneralNode{
 
 	@Override
 	public void dispatchEvent(PaxosMessage msg){
+		if (msg == null) return;
 //		if(leaderOracle.getLeader() == null){
 //			leaderOracle.runForLeader();
 //		}

@@ -100,6 +100,8 @@ public class Client extends GeneralNode{
 		if (slotIndex == offset) {
 			Logger.submitDebug("received comfirm of local slot: " + slotIndex);
 			offset++;
+			if (offset < inputValues.size())
+				propose(inputValues.get(offset), offset);
 		}
 	}
 

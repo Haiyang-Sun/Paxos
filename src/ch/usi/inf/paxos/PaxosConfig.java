@@ -14,13 +14,13 @@ public class PaxosConfig {
 	public static boolean msgDebug = false;
 	public static boolean msgHeartBeat = false;
 	public static boolean submitDebug = false;
-	public static boolean logClock = true;
+	public static boolean logClock = false;
 
 	public static final int NUM_ACCEPTORS = 3; 
 	public static final int NUM_QUORUM = 2; 
 
 	public static boolean extraThreadDispatching = true;
-	public static boolean escapePhase1 = false;
+	public static boolean escapePhase1 = true;
 	
 	static NetworkGroup clientNetwork;
 	static NetworkGroup proposerNetwork;
@@ -30,7 +30,7 @@ public class PaxosConfig {
 	static NetworkLevel networkLevel = NetworkLevel.NORMAL;
 
 	public static long decisionBroadcastIntervalMilisecs = 200;
-	public static long timeoutMilisecs = 1;
+	public static long timeoutMilisecs = 10;
 	public static int randomSleep = 100;
 	public static long clientBroadCastTime = 1;
 	public static long fetchEventInterval = 0; //wait time when the event list is empty
@@ -38,7 +38,7 @@ public class PaxosConfig {
 	public static long leaderHBInterval = 100;
 	public static long proposerInterval = leaderHBInterval;
 	public static long susptIntervalCnt = 3;
-	public static long learnerFetchInterval = 10;
+	public static long learnerFetchInterval = 1;
 
 	public static boolean initFromFile(String path){
 		try {
