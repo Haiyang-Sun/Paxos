@@ -38,8 +38,8 @@ public class Client extends GeneralNode{
 	 */
 	@Override
 	public void backgroundLoop() {
-		if(PaxosConfig.extraThreadDispatching)
-			new Thread(new DispatchThread(this)).start();
+//		if(PaxosConfig.extraThreadDispatching)
+//			new Thread(new DispatchThread(this)).start();
 		while(true) {
 			if (offset < inputValues.size())
 				propose(inputValues.get(offset), offset);
