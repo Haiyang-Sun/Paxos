@@ -3,7 +3,7 @@ package ch.usi.inf.logging;
 import ch.usi.inf.paxos.PaxosConfig;
 
 public class Logger {
-    public enum LoggerType {DEBUG, MSG_DEBUG, INFO, ERROR};
+    public enum LoggerType {DEBUG, MSG_DEBUG, INFO, ERROR, HEARTBEAT};
 
     public static void debug(final String log){
         write(LoggerType.DEBUG,log);
@@ -16,6 +16,9 @@ public class Logger {
     }
     public static void error(final String log){
         write(LoggerType.ERROR, log);
+    }
+    public static void heartbeat(final String log){
+        write(LoggerType.HEARTBEAT, log);
     }
 
     public static void write(final LoggerType type, final String log){
@@ -30,6 +33,10 @@ public class Logger {
             break;
         case INFO:
         	System.out.println(log);
+            break;
+        case HEARTBEAT:
+        	if(PaxosConfig.msgHeartBeat)
+        		System.out.println("MSG_HEARTBEAT: "+log);
             break;
         case ERROR:
             System.err.println("ERROR: "+log);

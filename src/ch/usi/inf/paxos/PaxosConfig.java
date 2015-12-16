@@ -12,6 +12,7 @@ import ch.usi.inf.paxos.roles.Proposer;
 public class PaxosConfig {
 	public static boolean debug = true;
 	public static boolean msgDebug = false;
+	public static boolean msgHeartBeat = false;
 	public static final int NUM_ACCEPTORS = 3; 
 	public static final int NUM_QUORUM = 2; 
 	
@@ -22,10 +23,10 @@ public class PaxosConfig {
 	public enum NetworkLevel {NORMAL};
 	static NetworkLevel networkLevel = NetworkLevel.NORMAL;
 	public static boolean extraThreadDispatching = true;
-	public static long decisionBroadcastIntervalMilisecs = 2000;
-	public static long timeoutMilisecs = 1000;
+	public static long decisionBroadcastIntervalMilisecs = 200;
+	public static long timeoutMilisecs = 100;
 	public static int randomSleep = 100;
-	public static long clientBroadCastTime = 5000;
+	public static long clientBroadCastTime = 10;
 	public static long fetchEventInterval = 1000; //wait time when the event list is empty
 	public static long timeoutCheckInterval = timeoutMilisecs / 2;
 	public static long leaderHBInterval = 1000;

@@ -31,7 +31,7 @@ public class PaxosMessenger {
 	
 	public static int MAX_PACKET_LENGTH = 1000;
 	
-	public enum MessageType{MSG_CLIENT, MSG_PROPOSER_PHASE1A, MSG_PROPOSER_PHASE2A,MSG_ACCEPTOR_PHASE1B,MSG_ACCEPTOR_PHASE2B, MSG_PROPOSER_DECIDE, MSG_ACCEPTOR_ASK_FOR_LEADER, MSG_ACCEPTOR_CURRENT_LEADER, MSG_PROPOSER_RUN_FOR_LEADER, MSG_UNKONWN, MSG_PROPOSER_LEADER_HEARTBEAT, MSG_PROPOSER_HEARTBEAT, MSG_CLIENT_SUCCESS};
+	public enum MessageType{MSG_CLIENT, MSG_PROPOSER_PHASE1A, MSG_PROPOSER_PHASE2A,MSG_ACCEPTOR_PHASE1B,MSG_ACCEPTOR_PHASE2B, MSG_PROPOSER_DECIDE, MSG_ACCEPTOR_ASK_FOR_LEADER, MSG_ACCEPTOR_CURRENT_LEADER, MSG_PROPOSER_RUN_FOR_LEADER, MSG_UNKONWN, MSG_PROPOSER_LEADER_HEARTBEAT, MSG_PROPOSER_HEARTBEAT, MSG_PROPOSER_CLIENT_SUCCESS};
 	
 	public static byte msgType2Byte(MessageType type){
 		switch(type){
@@ -57,7 +57,7 @@ public class PaxosMessenger {
 				return 9;
 			case MSG_PROPOSER_HEARTBEAT:
 				return 10;
-			case MSG_CLIENT_SUCCESS:
+			case MSG_PROPOSER_CLIENT_SUCCESS:
 				return 11;
 		}
 		return -1;
@@ -88,7 +88,7 @@ public class PaxosMessenger {
 			case 10:
 				return MessageType.MSG_PROPOSER_HEARTBEAT;
 			case 11:
-				return MessageType.MSG_CLIENT_SUCCESS;
+				return MessageType.MSG_PROPOSER_CLIENT_SUCCESS;
 		}
 		return MessageType.MSG_UNKONWN;
 	}
@@ -200,9 +200,9 @@ public class PaxosMessenger {
 			case MSG_PROPOSER_HEARTBEAT:
 				res = new PaxosProposerHeartBeatMessage(Proposer.getById(nodeId));
 				break;
-			case MSG_CLIENT_SUCCESS:
-				i1 = buf.getInt();
-				res = new PaxosClientSuccessMessage(Client.getById(nodeId), i1);
+			case MSG_PROPOSER_CLIENT_SUCCESS:
+				int clientId = buf.getInt();
+				res = new PaxosClientSuccessMessage(Proposer.getById(nodeId), clientId, slotIndex);
 				break;
 			case MSG_UNKONWN:
 				Logger.error("Unknown message is received");

@@ -5,7 +5,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
+import ch.usi.inf.logging.Logger;
 import ch.usi.inf.network.NetworkGroup;
 import ch.usi.inf.paxos.GeneralNode;
 import ch.usi.inf.paxos.PaxosConfig;
@@ -27,6 +30,12 @@ public class Acceptor extends GeneralNode{
 	static ConcurrentHashMap<Integer, Acceptor> instances = new ConcurrentHashMap<Integer, Acceptor>();
 	//HashSet<PaxosMessage> events = new HashSet<PaxosMessage>();
 	Queue<PaxosMessage> eventArray = new ArrayDeque<PaxosMessage>();
+	
+	//local variable after switching to a "pipeline" style
+	AtomicInteger maxSlot = new AtomicInteger(-1);
+	private long rnd = 0; 
+	private long v_rnd = 0;
+	private ValueType v_val = ValueType.NIL;
 	
 	public Acceptor(int id, NetworkGroup networkGroup) {
 		super(id, networkGroup);
@@ -50,13 +59,33 @@ public class Acceptor extends GeneralNode{
 	public synchronized void onReceivePhase1A(PaxosMessage msg){
 		PaxosPhase1AMessage phase1AMsg = (PaxosPhase1AMessage) msg;
 		int slot = msg.getSlotIndex();
-		rnds.putIfAbsent(slot, 0L);
-		v_rnds.putIfAbsent(slot, 0L);
-		v_vals.putIfAbsent(slot, ValueType.NIL);
-		if(phase1AMsg.getC_rnd() > rnds.get(slot)){
-			rnds.put(slot, phase1AMsg.getC_rnd());
-			sendPhase1B(slot,  rnds.get(slot), v_rnds.get(slot), v_vals.get(slot));
+		Logger.debug("received phase1A from proposer " + msg.getFrom().getId() + 
+				" for slot " + slot +
+				" with c_rnd " + phase1AMsg.getC_rnd());
+		//current slot
+		if (slot == maxSlot.get()){
+			if(phase1AMsg.getC_rnd() > rnd){
+				rnd = phase1AMsg.getC_rnd(); 
+				v_rnd = 0;
+				v_val = ValueType.NIL;
+			}
 		}
+		//newer slot, which means the previous ones have been decided
+		if (slot > maxSlot.get()){
+			maxSlot.set(slot);
+			rnd = phase1AMsg.getC_rnd(); 
+			v_rnd = 0;
+			v_val = ValueType.NIL;
+		}
+		sendPhase1B(maxSlot.get(),  rnd, v_rnd, v_val);
+
+//		rnds.putIfAbsent(slot, 0L);
+//		v_rnds.putIfAbsent(slot, 0L);
+//		v_vals.putIfAbsent(slot, ValueType.NIL);
+//		if(phase1AMsg.getC_rnd() > rnds.get(slot)){
+//			rnds.put(slot, phase1AMsg.getC_rnd());
+//			sendPhase1B(slot,  rnds.get(slot), v_rnds.get(slot), v_vals.get(slot));
+//		}
 	}
 	public synchronized void sendPhase1B(int slotIndex, Long rnd, Long v_rnd, ValueType v_val){
 		PaxosPhase1BMessage msg = new PaxosPhase1BMessage(this, slotIndex, rnd, v_rnd, v_val);
@@ -65,15 +94,25 @@ public class Acceptor extends GeneralNode{
 	public synchronized void onReceivePhase2A(PaxosMessage msg){
 		PaxosPhase2AMessage phase2AMsg = (PaxosPhase2AMessage) msg;
 		int slot = msg.getSlotIndex();
+		//not current slot, ignore
+		if (slot != maxSlot.get()){
+			return;
+		}
+
 		//in case an acceptor is started half-way
-		rnds.putIfAbsent(slot, 0L);
-		v_rnds.putIfAbsent(slot, 0L);
-		v_vals.putIfAbsent(slot, ValueType.NIL);
+		//rnds.putIfAbsent(slot, 0L);
+		//v_rnds.putIfAbsent(slot, 0L);
+		//v_vals.putIfAbsent(slot, ValueType.NIL);
 		
-		if(phase2AMsg.getC_rnd() >= rnds.get(slot)){
-			v_rnds.put(slot, phase2AMsg.getC_rnd());
-			v_vals.put(slot, phase2AMsg.getC_val());
-			sendPhase2B(slot, v_rnds.get(slot), v_vals.get(slot));
+		if(phase2AMsg.getC_rnd() >= rnd){
+//			v_rnds.put(slot, phase2AMsg.getC_rnd());
+//			v_vals.put(slot, phase2AMsg.getC_val());
+			v_rnd = phase2AMsg.getC_rnd();
+			v_val = phase2AMsg.getC_val();
+			sendPhase2B(slot, v_rnd, v_val);
+		} else {
+			//TODO: add reject message
+			sendPhase2B(slot, v_rnd, v_val);
 		}
 	}
 	public synchronized void sendPhase2B(int slotIndex, Long v_rnd, ValueType v_val){
