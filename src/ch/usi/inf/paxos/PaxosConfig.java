@@ -37,7 +37,7 @@ public class PaxosConfig {
 	public static long leaderHBInterval = 1000;
 	public static long proposerInterval = leaderHBInterval;
 	public static long susptIntervalCnt = 3;
-	public static long learnerFetchInterval = 1000;
+	public static long learnerFetchInterval = 100;
 
 	public static boolean initFromFile(String path){
 		try {

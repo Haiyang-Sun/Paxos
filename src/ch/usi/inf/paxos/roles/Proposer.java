@@ -321,6 +321,9 @@ public class Proposer extends GeneralNode{
 
 	private void increaseAndResendPhase1A() {
 		c_rnd_prefix.incrementAndGet();
+		PaxosMessage msg = phase1ACaches.get(proposerCurSlot.get());
+		if (msg != null)
+			timeoutManager.remove(msg);
 		sendPhase1A();
 	}
 
