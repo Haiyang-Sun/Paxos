@@ -10,7 +10,7 @@ import ch.usi.inf.network.NetworkGroup;
 import ch.usi.inf.paxos.roles.Proposer;
 
 public class PaxosConfig {
-	public static boolean debug = true;
+	public static boolean debug = false;
 	public static boolean msgDebug = false;
 	public static boolean msgHeartBeat = false;
 	public static boolean submitDebug = false;
@@ -47,7 +47,7 @@ public class PaxosConfig {
 			try{
 				while(scanner.hasNextLine()){
 					line=scanner.nextLine();
-					String[] elems = line.split("\\s");
+					String[] elems = line.split("\\s+");
 					switch (elems[0]){
 						case "clients":
 							PaxosConfig.clientNetwork = new NetworkGroup(elems[1], Integer.parseInt(elems[2]));
