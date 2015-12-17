@@ -18,9 +18,7 @@ public class PaxosConfig {
 
 	public static final int NUM_ACCEPTORS = 3; 
 	public static final int NUM_QUORUM = 2; 
-
-	public static boolean extraThreadDispatching = true;
-	public static boolean escapePhase1 = true;
+	public static boolean escapePhase1 = false;
 	
 	static NetworkGroup clientNetwork;
 	static NetworkGroup proposerNetwork;
@@ -28,6 +26,7 @@ public class PaxosConfig {
 	static NetworkGroup learnerNetwork;
 	public enum NetworkLevel {NORMAL};
 	static NetworkLevel networkLevel = NetworkLevel.NORMAL;
+	public static boolean extraThreadDispatching = true;
 
 	public static long decisionBroadcastIntervalMilisecs = 200;
 	public static long timeoutMilisecs = 10;
