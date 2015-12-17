@@ -153,6 +153,9 @@ public class Proposer extends GeneralNode{
 				case MSG_PROPOSER_HEARTBEAT:
 					onReceiveProposerHeartBeat(msg);
 					break;
+				case MSG_LEARNER_LEARN:
+					onReceiveLearn(msg);
+					break;
 			}
 		}else {
 			int slot = msg.getSlotIndex();
@@ -429,7 +432,7 @@ public class Proposer extends GeneralNode{
 	private synchronized void onReceiveLearn(PaxosMessage msg) {
 		PaxosLearnMessage learnMsg = (PaxosLearnMessage)msg;
 		int slot = learnMsg.getRequireSlot();
-		if (proposerCurSlot.get() >= slot){
+		if (proposerCurSlot.get() >= slot && clientAcceptedList.size() > slot){
 			sendPush(slot, clientAcceptedList.get(slot));
 		}
 	}
